@@ -156,6 +156,8 @@ tfoot td{font-weight:700;border-top:1px solid var(--line)}
 .ms .tile span{display:block;font-size:12px;color:var(--muted);font-weight:600}
 .ms .tile b{font-family:var(--display);font-size:26px;line-height:1.2}
 .ms .tile small{display:block;font-size:13px;color:var(--muted)}
+.ms .tile .pill{display:inline-flex;margin-top:6px;font-size:12px;color:inherit}
+.ms .tile .pill.good{color:var(--good)} .ms .tile .pill.warn{color:var(--warn)} .ms .tile .pill.none{color:var(--muted)}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;border-radius:999px;padding:3px 10px}
 .pill.good{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}
 .pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
@@ -673,7 +675,7 @@ function renderProgress(){
     box.append(
       el("div",{class:"tile"},el("span",{text:(tg.measureLabel||"Waist")+", goal "+ms.to+" in"}),el("b",{class:"num",text:lastW?r2(lastW.y)+" in":"–"}),el("small",{text:"Started at "+ms.from+" in. Pace today: "+r2(paceAt(ms,ms.from,ms.to,todayStr))+" in"}),status(wpts,ms.from,ms.to,"in")),
       el("div",{class:"tile"},el("span",{text:"Weight, goal "+ms.weightTo+" lb"}),el("b",{class:"num",text:lastK?r2(lastK.y)+" lb":"–"}),el("small",{text:"Started at "+ms.weightFrom+" lb. Pace today: "+Math.round(paceAt(ms,ms.weightFrom,ms.weightTo,todayStr))+" lb"}),status(kpts,ms.weightFrom,ms.weightTo,"lb")),
-      el("div",{class:"tile"},el("span",{text:"Est. body fat (tape)"}),el("b",{class:"num",text:lastB?Math.round(lastB.y)+"%":"–"}),el("small",{text:bpts.length>1?"Was "+Math.round(bpts[0].y)+"% at the start":"Rough estimate, watch the trend"})),
+      el("div",{class:"tile"},el("span",{text:"Est. body fat (tape)"}),el("b",{class:"num",text:lastB?Math.round(lastB.y)+"%":"–"}),el("small",{text:(bpts.length>1?"Was "+Math.round(bpts[0].y)+"% at the start. ":"")+(who==="maria"?"The tape formula reads high on shorter frames, so trust the direction, not the number.":"Rough estimate, trust the direction.")})),
       el("div",{class:"tile"},el("span",{text:ms.name||"Stage 1"}),el("b",{class:"num",text:wk+" wks"}),el("small",{text:"left, ends "+shortDate(ms.end)}))
     );
     mbox.append(box);
