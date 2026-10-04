@@ -143,6 +143,36 @@ tfoot td{font-weight:700;border-top:1px solid var(--line)}
 .tnote textarea{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-height:52px;resize:vertical}
 .tnote{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
 
+/* tabs + progress */
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line)}
+.tabs button{font:inherit;font-weight:600;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:8px 14px;cursor:pointer;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.pane{display:grid;gap:20px}
+.pane[hidden]{display:none}
+.pggrid{display:grid;gap:20px;grid-template-columns:1fr}
+@media (min-width:820px){.pggrid{grid-template-columns:1fr 1fr}}
+.ms{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.ms .tile{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.ms .tile span{display:block;font-size:12px;color:var(--muted);font-weight:600}
+.ms .tile b{font-family:var(--display);font-size:26px;line-height:1.2}
+.ms .tile small{display:block;font-size:13px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;border-radius:999px;padding:3px 10px}
+.pill.good{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.none{background:var(--sunk);color:var(--muted)}
+.chart{position:relative;margin-top:10px}
+.chart svg{width:100%;height:auto;display:block}
+.chart .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:5px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-120%)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.legend i.dash{background:none;border-top:2px dashed var(--muted);height:0}
+.cons{display:grid;gap:6px;margin-top:16px}
+.cons .row{display:grid;grid-template-columns:130px 1fr 44px;gap:10px;align-items:center;font-size:14px}
+.cons .track{height:10px;border-radius:99px;background:var(--line);overflow:hidden}
+.cons .track i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+table.avg td,table.avg th{padding:6px 8px;text-align:right}
+table.avg td:first-child,table.avg th:first-child{text-align:left}
+
 /* reminders */
 .reminders{display:grid;gap:10px}
 .reminders:empty{display:none}
@@ -206,6 +236,13 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
   <div class="notice" id="status" hidden></div>
   <div class="reminders" id="reminders"></div>
 
+  <nav class="tabs" role="tablist" aria-label="Dashboard views">
+    <button role="tab" id="tabBtnToday" aria-selected="true" aria-controls="tabToday">Today</button>
+    <button role="tab" id="tabBtnProgress" aria-selected="false" aria-controls="tabProgress">Progress</button>
+  </nav>
+
+  <div id="tabToday" role="tabpanel" aria-labelledby="tabBtnToday" class="pane">
+
   <section class="panel train" aria-labelledby="trainH">
     <div class="trainhead"><h2 id="trainH">Today's training</h2><span class="eyebrow" id="trainWeek"></span></div>
     <div id="training"></div>
@@ -259,11 +296,32 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
   </section>
 
   <section class="panel" aria-labelledby="meH">
-    <h2 id="meH">My numbers</h2>
+    <h2 id="meH">Numbers</h2>
     <div class="sub" id="meSub">Only you can see this section. No side by side comparisons, just your own trend. Measure every two weeks, in the morning before eating.</div>
     <div id="meBody"></div>
     <div id="meForm"></div>
   </section>
+  </div>
+
+  <div id="tabProgress" role="tabpanel" aria-labelledby="tabBtnProgress" class="pane" hidden>
+    <section class="panel" aria-labelledby="pgH">
+      <div class="trainhead"><h2 id="pgH">Progress</h2><span class="eyebrow" id="pgWho"></span></div>
+      <div class="sub">Habits are the leading indicators, the things you control every day. These are the lagging ones: what the habits are producing. Judge them on two week trends, never one weigh-in.</div>
+      <div id="pgMilestone"></div>
+    </section>
+    <div class="pggrid" id="pgCharts"></div>
+    <section class="panel" aria-labelledby="pgHabH">
+      <h2 id="pgHabH">Habits, week by week</h2>
+      <div class="sub">Percent of the 49 possible points each week, both of you.</div>
+      <div id="pgWeekly"></div>
+      <div id="pgConsistency"></div>
+    </section>
+    <section class="panel" aria-labelledby="pgAvgH">
+      <h2 id="pgAvgH">Weekly averages</h2>
+      <div class="sub">From what you copy in from your food app and the sleep times you log. Blank means nothing was logged that week.</div>
+      <div class="tablewrap" id="pgAvg"></div>
+    </section>
+  </div>
 </div>
 
 <script>
@@ -466,6 +524,7 @@ function render(){
   renderCoach();
   renderMe();
   renderReminders();
+  renderProgress();
 }
 
 // training plan
@@ -507,6 +566,169 @@ function renderTraining(){
     t.append(fr,el("label",{class:"tnote",for:"t_note"},"Session notes",ta));
   }
   box.append(t);
+}
+
+// ---- progress tab (lagging indicators) ----
+let progress=null;
+let tab="today";
+try{const t=localStorage.getItem("habitcup.tab");if(t==="progress")tab=t}catch(e){}
+function setTab(t){
+  tab=t;try{localStorage.setItem("habitcup.tab",t)}catch(e){}
+  document.getElementById("tabToday").hidden=t!=="today";
+  document.getElementById("tabProgress").hidden=t!=="progress";
+  document.getElementById("tabBtnToday").setAttribute("aria-selected",String(t==="today"));
+  document.getElementById("tabBtnProgress").setAttribute("aria-selected",String(t==="progress"));
+  render();
+}
+document.getElementById("tabBtnToday").onclick=()=>setTab("today");
+document.getElementById("tabBtnProgress").onclick=()=>setTab("progress");
+setTimeout(()=>setTab(tab),0);
+
+const PROGRAM_MONDAY="2026-10-05";
+function fmtMin(x){if(x==null)return"";const m=Math.floor(x),s=Math.round((x-m)*60);return m+":"+String(s).padStart(2,"0")}
+function shortDate(d){return parse(d).toLocaleDateString(undefined,{month:"short",day:"numeric"})}
+function daysBetween(a,b){return Math.round((parse(b)-parse(a))/864e5)}
+function addDays(d,n){const x=parse(d);x.setDate(x.getDate()+n);return iso(x)}
+function bodyFat(p,m){
+  const h=progress&&progress.heights&&progress.heights[p];
+  if(!h||m.neck==null)return null;
+  if(p==="freddy"){if(m.belly==null||m.belly<=m.neck)return null;return 86.010*Math.log10(m.belly-m.neck)-70.041*Math.log10(h)+36.76}
+  if(m.waist==null||m.hips==null)return null;
+  return 163.205*Math.log10(m.waist+m.hips-m.neck)-97.684*Math.log10(h)-78.387;
+}
+function paceAt(ms,from,to,d){
+  const total=daysBetween(ms.start,ms.end),t=Math.max(0,Math.min(total,daysBetween(ms.start,d)));
+  return from+(to-from)*t/total;
+}
+
+// Line chart: one y scale, thin 2px lines, 8px markers, optional dashed pace line, hover tooltips.
+function lineChart(opt){
+  const W=600,H=220,pl=44,pr=16,pt=14,pb=28;
+  const pts=opt.series.flatMap(s=>s.points);
+  let xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+  if(opt.pace){xs=xs.concat([opt.pace.x0,opt.pace.x1]);ys=ys.concat([opt.pace.y0,opt.pace.y1])}
+  if(opt.yMin!=null)ys.push(opt.yMin); if(opt.yMax!=null)ys.push(opt.yMax);
+  const wrap=el("div",{class:"chart"});
+  if(!pts.length&&!opt.pace){wrap.append(el("div",{class:"notice",text:opt.empty||"Nothing logged yet."}));return wrap}
+  const x0=xs.reduce((a,b)=>a<b?a:b),x1=xs.reduce((a,b)=>a>b?a:b);
+  let y0=Math.min(...ys),y1=Math.max(...ys); const padY=(y1-y0)*0.12||1; y0-=padY;y1+=padY;
+  if(opt.yMin!=null)y0=Math.min(y0,opt.yMin); if(opt.yMax!=null)y1=Math.max(y1,opt.yMax);
+  const span=Math.max(1,daysBetween(x0,x1));
+  const X=d=>pl+daysBetween(x0,d)/span*(W-pl-pr), Y=v=>pt+(y1-v)/(y1-y0)*(H-pt-pb);
+  const ns="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(ns,"svg");svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("role","img");svg.setAttribute("aria-label",opt.label||"chart");
+  const add=(t,a,txt)=>{const e=document.createElementNS(ns,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;svg.append(e);return e};
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){const v=y0+(y1-y0)*i/ticks;add("line",{x1:pl,x2:W-pr,y1:Y(v),y2:Y(v),stroke:"var(--line)","stroke-width":1});add("text",{x:pl-6,y:Y(v)+4,"text-anchor":"end"},(opt.fmt||(v=>Math.round(v*10)/10))(v))}
+  add("text",{x:pl,y:H-8},shortDate(x0));add("text",{x:W-pr,y:H-8,"text-anchor":"end"},shortDate(x1));
+  if(opt.pace)add("line",{x1:X(opt.pace.x0),y1:Y(opt.pace.y0),x2:X(opt.pace.x1),y2:Y(opt.pace.y1),stroke:"var(--muted)","stroke-width":2,"stroke-dasharray":"6 5",fill:"none"});
+  const tip=el("div",{class:"tip",hidden:true});
+  for(const s of opt.series){
+    const p=s.points.slice().sort((a,b)=>a.x<b.x?-1:1);
+    if(p.length>1)add("path",{d:p.map((q,i)=>(i?"L":"M")+X(q.x)+" "+Y(q.y)).join(" "),fill:"none",stroke:s.color,"stroke-width":2,"stroke-linejoin":"round","stroke-linecap":"round"});
+    for(const q of p){
+      add("circle",{cx:X(q.x),cy:Y(q.y),r:4.5,fill:s.color,stroke:"var(--surface)","stroke-width":2});
+      const hit=add("circle",{cx:X(q.x),cy:Y(q.y),r:14,fill:"transparent",tabindex:0});
+      const show=()=>{tip.textContent=(opt.series.length>1?s.name+", ":"")+shortDate(q.x)+": "+(opt.fmtTip||opt.fmt||(v=>Math.round(v*10)/10))(q.y);tip.style.left=(X(q.x)/W*100)+"%";tip.style.top=(Y(q.y)/H*100)+"%";tip.hidden=false};
+      hit.addEventListener("mouseenter",show);hit.addEventListener("focus",show);hit.addEventListener("click",show);
+      hit.addEventListener("mouseleave",()=>tip.hidden=true);hit.addEventListener("blur",()=>tip.hidden=true);
+    }
+  }
+  wrap.append(svg,tip);
+  const lg=el("div",{class:"legend"});
+  if(opt.series.length>1||opt.pace){
+    for(const s of opt.series){const i=el("i");i.style.background=s.color;lg.append(el("span",null,i,s.name))}
+    if(opt.pace)lg.append(el("span",null,el("i",{class:"dash"}),opt.pace.label||"On pace"));
+    wrap.append(lg);
+  }
+  return wrap;
+}
+function chartPanel(title,sub,chart){
+  return el("section",{class:"panel"},el("h2",{text:title}),sub?el("div",{class:"sub",text:sub}):null,chart);
+}
+
+function renderProgress(){
+  if(tab!=="progress")return;
+  const tg=T(who), name=tg.name, col=`var(--${who})`;
+  document.getElementById("pgWho").textContent=name;
+  const ms=progress&&progress.milestones&&progress.milestones[who];
+  const mine=measures.filter(m=>m.person===who).sort((a,b)=>a.date<b.date?-1:1);
+  const key=(ms&&ms.key)||tg.measure||"waist";
+  const wpts=mine.filter(m=>m[key]!=null).map(m=>({x:m.date,y:m[key]}));
+  const kpts=mine.filter(m=>m.weight!=null).map(m=>({x:m.date,y:m.weight}));
+  const bpts=mine.map(m=>({x:m.date,y:bodyFat(who,m)})).filter(p=>p.y!=null&&isFinite(p.y));
+
+  // milestone tiles
+  const mbox=document.getElementById("pgMilestone");mbox.replaceChildren();
+  if(ms){
+    const wk=Math.max(0,Math.ceil(daysBetween(todayStr,ms.end)/7));
+    const status=(pts,from,to,unit)=>{
+      if(!pts.length)return el("span",{class:"pill none",text:"No data yet"});
+      const last=pts[pts.length-1],exp=paceAt(ms,from,to,last.x),diff=last.y-exp;
+      if(pts.length<2&&daysBetween(ms.start,last.x)<7)return el("span",{class:"pill none",text:"Baseline set"});
+      return diff<=0.25*(unit==="lb"?4:1)?el("span",{class:"pill good",text:"✓ On pace"}):el("span",{class:"pill warn",text:"△ Behind by "+r2(diff)+" "+unit});
+    };
+    const lastW=wpts[wpts.length-1],lastK=kpts[kpts.length-1],lastB=bpts[bpts.length-1];
+    const box=el("div",{class:"ms"});
+    box.append(
+      el("div",{class:"tile"},el("span",{text:(tg.measureLabel||"Waist")+", goal "+ms.to+" in"}),el("b",{class:"num",text:lastW?r2(lastW.y)+" in":"–"}),el("small",{text:"Started at "+ms.from+" in. Pace today: "+r2(paceAt(ms,ms.from,ms.to,todayStr))+" in"}),status(wpts,ms.from,ms.to,"in")),
+      el("div",{class:"tile"},el("span",{text:"Weight, goal "+ms.weightTo+" lb"}),el("b",{class:"num",text:lastK?r2(lastK.y)+" lb":"–"}),el("small",{text:"Started at "+ms.weightFrom+" lb. Pace today: "+Math.round(paceAt(ms,ms.weightFrom,ms.weightTo,todayStr))+" lb"}),status(kpts,ms.weightFrom,ms.weightTo,"lb")),
+      el("div",{class:"tile"},el("span",{text:"Est. body fat (tape)"}),el("b",{class:"num",text:lastB?Math.round(lastB.y)+"%":"–"}),el("small",{text:bpts.length>1?"Was "+Math.round(bpts[0].y)+"% at the start":"Rough estimate, watch the trend"})),
+      el("div",{class:"tile"},el("span",{text:ms.name||"Stage 1"}),el("b",{class:"num",text:wk+" wks"}),el("small",{text:"left, ends "+shortDate(ms.end)}))
+    );
+    mbox.append(box);
+  }
+
+  // charts
+  const cbox=document.getElementById("pgCharts");cbox.replaceChildren();
+  cbox.append(
+    chartPanel((tg.measureLabel||"Waist")+" (in)","The number that matters most. Dashed line is the pace that reaches your stage goal on time.",
+      lineChart({label:"waist",series:[{name,color:col,points:wpts}],pace:ms?{x0:ms.start,y0:ms.from,x1:ms.end,y1:ms.to,label:"Pace to "+ms.to+" in"}:null,fmt:v=>(Math.round(v*4)/4).toFixed(2).replace(/\.?0+$/,""),empty:"No waist measurements yet."})),
+    chartPanel("Weight (lb)",kpts.length<2?"Friday mornings, before eating. Expect it to bounce a pound or two week to week; that's water, not fat.":"Friday mornings, before eating. Ignore single weeks, read the slope.",
+      lineChart({label:"weight",series:[{name,color:col,points:kpts}],pace:ms?{x0:ms.start,y0:ms.weightFrom,x1:ms.end,y1:ms.weightTo,label:"Pace to "+ms.weightTo+" lb"}:null,fmt:v=>Math.round(v),fmtTip:v=>r2(v)+" lb",empty:"No weigh-ins yet."})),
+    chartPanel("Estimated body fat (%)","From full tape days (Navy formula). Rough on any single day; useful as a trend.",
+      lineChart({label:"body fat",series:[{name,color:col,points:bpts}],fmt:v=>Math.round(v),fmtTip:v=>Math.round(v*10)/10+"%",empty:"Needs a full tape day: neck, "+(who==="freddy"?"belly button waist":"narrowest waist and hips")+"."}))
+  );
+  const bm=progress&&progress.benchmark&&progress.benchmark[who];
+  if(bm){
+    const pp=mine.filter(m=>m[bm.key]!=null).map(m=>({x:m.date,y:m[bm.key]}));
+    cbox.append(chartPanel(bm.label,bm.note,lineChart({label:bm.label,series:[{name,color:col,points:pp}],fmt:bm.key==="run3"?fmtMin:(v=>Math.round(v)),fmtTip:bm.key==="run3"?fmtMin:(v=>v+" lb"),empty:bm.empty})));
+  }
+
+  // weekly habit score, both people
+  const weeks=[];for(let d=PROGRAM_MONDAY;d<=todayStr;d=addDays(d,7))weeks.push(d);
+  const wkPts=(p,mon)=>{let n=0;for(let i=0;i<7;i++)n+=pts(logOf(p,addDays(mon,i)));return n};
+  const ser=PEOPLE.map(p=>({name:T(p).name,color:`var(--${p})`,points:weeks.map(m=>({x:m,y:Math.round(wkPts(p,m)/MAXWEEK*100)}))}));
+  const wbox=document.getElementById("pgWeekly");wbox.replaceChildren(lineChart({label:"weekly habit score",series:ser,yMin:0,yMax:100,fmt:v=>Math.round(v)+"%",empty:"Starts Monday, October 5."}));
+
+  // consistency by habit, last 4 weeks (only days that have happened)
+  const cbox2=document.getElementById("pgConsistency");cbox2.replaceChildren();
+  const startC=[addDays(todayStr,-27),PROGRAM_MONDAY].sort()[1];
+  const days=[];for(let d=startC;d<=todayStr;d=addDays(d,1))days.push(d);
+  const c=el("div",{class:"cons"},el("div",{class:"eyebrow",text:name+", last "+days.length+" days, how often each habit got done"}));
+  if(!days.length||todayStr<PROGRAM_MONDAY)c.append(el("div",{class:"notice",text:"Fills in once the plan starts."}));
+  else for(const h of HABITS){
+    const n=days.filter(d=>(logOf(who,d).h||{})[h.k]).length,pc=Math.round(n/days.length*100);
+    const tr=el("div",{class:"track"});const i=el("i");i.style.width=pc+"%";tr.append(i);
+    c.append(el("div",{class:"row"},el("span",{text:h.t}),tr,el("span",{class:"num",style:"text-align:right",text:pc+"%"})));
+  }
+  cbox2.append(c);
+
+  // weekly averages
+  const abox=document.getElementById("pgAvg");abox.replaceChildren();
+  const t=el("table",{class:"avg num"});
+  t.append(el("thead",null,el("tr",null,...["Week of","Points","Calories","Protein","Sleep","Treats","Energy","Hunger"].map(h=>el("th",{scope:"col",text:h})))));
+  const tb=el("tbody");
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  for(const m of weeks.slice().reverse()){
+    const ls=[0,1,2,3,4,5,6].map(i=>logOf(who,addDays(m,i)));
+    const cal=avg(ls.map(l=>l.cal).filter(v=>v!=null)),pro=avg(ls.map(l=>l.protein).filter(v=>v!=null));
+    const sl=avg(ls.map(l=>hoursBetween(l.bedTime,l.wakeTime)).filter(v=>v!=null));
+    const ci=checkins[who+"_"+m]||{};
+    tb.append(el("tr",null,el("td",{text:shortDate(m)}),el("td",{text:wkPts(who,m)+"/"+MAXWEEK}),el("td",{text:cal==null?"":Math.round(cal).toLocaleString()}),el("td",{text:pro==null?"":Math.round(pro)+" g"}),el("td",{text:sl==null?"":sl.toFixed(1)+" h"}),el("td",{text:String(ls.reduce((n,l)=>n+(l.treats||0),0))}),el("td",{text:ci.energy?ci.energy+"/5":""}),el("td",{text:ci.hunger?ci.hunger+"/5":""})));
+  }
+  if(!weeks.length)tb.append(el("tr",null,el("td",{colspan:8,text:"Starts Monday, October 5."})));
+  t.append(tb);abox.append(t);
 }
 
 // reminders, shown only when the page is open
@@ -586,6 +808,7 @@ function buildForm(){
   const tg=T(who);
   const f=el("form",{class:"form",id:"mform"});
   const fields=[["m_date","Date","date",todayStr],["m_waist","Waist, narrowest (in)","number",""],["m_belly","Waist at belly button (in)","number",""],["m_hips","Hips (in)","number",""],["m_neck","Neck (in)","number",""],["m_chest","Chest (in)","number",""],["m_thigh","Right thigh (in)","number",""],["m_arm","Right arm (in)","number",""],["m_weight","Weight (lb)","number",""]];
+  fields.push(who==="freddy"?["m_run3","3 mile time (min, like 28.5)","number",""]:["m_lift","Goblet squat weight (lb)","number",""]);
   for(const [id,lab,type,val] of fields){f.append(el("label",{for:id},lab,el("input",{id,type,step:type==="number"?"0.25":null,inputmode:type==="number"?"decimal":null,value:val})))}
   const btn=el("button",{class:"btn primary",type:"submit",style:"align-self:end"},"Save measurement");
   f.append(btn);
@@ -593,8 +816,8 @@ function buildForm(){
     ev.preventDefault();
     const g=id=>{const x=document.getElementById(id);return x&&x.value!==""?Number(x.value):null};
     const date=document.getElementById("m_date").value||todayStr;
-    const row={person:who,date,waist:g("m_waist"),belly:g("m_belly"),hips:g("m_hips"),neck:g("m_neck"),chest:g("m_chest"),thigh:g("m_thigh"),arm:g("m_arm"),weight:g("m_weight")};
-    if(row.waist==null&&row.belly==null&&row.weight==null){setStatus("Add at least a waist measurement or a weight.");return}
+    const row={person:who,date,waist:g("m_waist"),belly:g("m_belly"),hips:g("m_hips"),neck:g("m_neck"),chest:g("m_chest"),thigh:g("m_thigh"),arm:g("m_arm"),weight:g("m_weight"),run3:g("m_run3"),lift:g("m_lift")};
+    if(row.waist==null&&row.belly==null&&row.weight==null&&row.run3==null&&row.lift==null){setStatus("Add at least one number.");return}
     btn.disabled=true;
     try{await post({action:"addMeasurement",measurement:row});measures=measures.filter(m=>!(m.person===who&&m.date===date)).concat([row]);setStatus("");render();f.querySelectorAll('input[type="number"]').forEach(i=>i.value="")}
     catch(e){setStatus("That measurement didn't save. Try again in a moment.")}
@@ -617,12 +840,12 @@ function buildForm(){
 }
 function renderMe(){
   const tg=T(who);
-  document.getElementById("meSub").textContent="Only you can see this section. No side by side comparisons, just your own trend. "+(tg.measureEvery||"Measure in the morning before eating")+".";
+  document.getElementById("meSub").textContent=tg.name+"'s measurements. "+(tg.measureEvery||"Measure in the morning before eating")+". Charts are on the Progress tab.";
   const fbox=document.getElementById("meForm"), body=document.getElementById("meBody");
   const note=t=>{fbox.replaceChildren();formFor=null;body.replaceChildren(el("div",{class:"notice",style:"margin-top:12px",text:t}))};
   if(!loaded){note("Connecting…");return}
-  if(who!==me){note("Only "+T(who).name+" can see "+(who==="freddy"?"his":"her")+" numbers. No side by side comparisons.");return}
-  if(formFor!==who){buildForm();formFor=who}
+  if(who!==me){fbox.replaceChildren();formFor=null}
+  else if(formFor!==who){buildForm();formFor=who}
   const gi=document.getElementById("g_val");
   if(gi&&document.activeElement!==gi&&goals[who]!=null)gi.value=String(goals[who]);
   body.replaceChildren();
@@ -654,6 +877,8 @@ function renderMe(){
     if(m.chest!=null)parts.push("chest "+m.chest);
     if(m.thigh!=null)parts.push("thigh "+m.thigh);
     if(m.arm!=null)parts.push("arm "+m.arm);
+    if(m.run3!=null)parts.push("3 mi "+fmtMin(m.run3));
+    if(m.lift!=null)parts.push("goblet squat "+m.lift+" lb");
     if(m.weight!=null)parts.push(m.weight+" lb");
     const dv=(first&&m!==first&&m[key]!=null)?r2(m[key]-first[key]):null;
     list.append(el("div",{class:"mrow"},el("span",null,el("b",{text:parse(m.date).toLocaleDateString(undefined,{month:"short",day:"numeric"})})," ",parts.join(", ")),
@@ -711,7 +936,7 @@ async function fetchSnapshot(){
 function apply(d){
   me=d.me;
   if(d.targets)targets={people:Object.assign({},DEFAULT_TARGETS.people,d.targets.people||{}),rewards:d.rewards||d.targets.rewards||DEFAULT_TARGETS.rewards};
-  plans=d.plans||{};coach=d.coach||null;checkins=d.checkins||{};measures=d.measures||[];goals=d.goals||{};
+  plans=d.plans||{};coach=d.coach||null;progress=d.progress||null;checkins=d.checkins||{};measures=d.measures||[];goals=d.goals||{};
   if(Date.now()-lastWrite>8000) logs=d.logs||{};
   loaded=true;
 }
