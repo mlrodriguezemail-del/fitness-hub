@@ -694,7 +694,7 @@ function renderProgress(){
   const bm=progress&&progress.benchmark&&progress.benchmark[who];
   if(bm){
     const pp=mine.filter(m=>m[bm.key]!=null).map(m=>({x:m.date,y:m[bm.key]}));
-    cbox.append(chartPanel(bm.label,bm.note,lineChart({label:bm.label,series:[{name,color:col,points:pp}],fmt:bm.key==="run3"?fmtMin:(v=>Math.round(v)),fmtTip:bm.key==="run3"?fmtMin:(v=>v+" lb"),empty:bm.empty})));
+    cbox.append(chartPanel(bm.label,bm.note,lineChart({label:bm.label,series:[{name,color:col,points:pp}],fmt:bm.key==="run3"?fmtMin:(v=>Math.round(v)),fmtTip:bm.key==="run3"?fmtMin:(v=>v+" "+(bm.unit||"")),empty:bm.empty})));
   }
 
   // weekly habit score, both people
@@ -810,7 +810,8 @@ function buildForm(){
   const tg=T(who);
   const f=el("form",{class:"form",id:"mform"});
   const fields=[["m_date","Date","date",todayStr],["m_waist","Waist, narrowest (in)","number",""],["m_belly","Waist at belly button (in)","number",""],["m_hips","Hips (in)","number",""],["m_neck","Neck (in)","number",""],["m_chest","Chest (in)","number",""],["m_thigh","Right thigh (in)","number",""],["m_arm","Right arm (in)","number",""],["m_weight","Weight (lb)","number",""]];
-  fields.push(who==="freddy"?["m_run3","3 mile time (min, like 28.5)","number",""]:["m_lift","Goblet squat weight (lb)","number",""]);
+  const bmk=progress&&progress.benchmark&&progress.benchmark[who];
+  fields.push(who==="freddy"?["m_run3",(bmk&&bmk.formLabel)||"3 mile time (min, like 28.5)","number",""]:["m_lift",(bmk&&bmk.formLabel)||"Push-ups, max in one set","number",""]);
   for(const [id,lab,type,val] of fields){f.append(el("label",{for:id},lab,el("input",{id,type,step:type==="number"?"0.25":null,inputmode:type==="number"?"decimal":null,value:val})))}
   const btn=el("button",{class:"btn primary",type:"submit",style:"align-self:end"},"Save measurement");
   f.append(btn);
@@ -880,7 +881,7 @@ function renderMe(){
     if(m.thigh!=null)parts.push("thigh "+m.thigh);
     if(m.arm!=null)parts.push("arm "+m.arm);
     if(m.run3!=null)parts.push("3 mi "+fmtMin(m.run3));
-    if(m.lift!=null)parts.push("goblet squat "+m.lift+" lb");
+    if(m.lift!=null)parts.push(m.lift+" push-ups");
     if(m.weight!=null)parts.push(m.weight+" lb");
     const dv=(first&&m!==first&&m[key]!=null)?r2(m[key]-first[key]):null;
     list.append(el("div",{class:"mrow"},el("span",null,el("b",{text:parse(m.date).toLocaleDateString(undefined,{month:"short",day:"numeric"})})," ",parts.join(", ")),
