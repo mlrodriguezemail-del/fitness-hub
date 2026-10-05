@@ -175,6 +175,13 @@ tfoot td{font-weight:700;border-top:1px solid var(--line)}
 table.avg td,table.avg th{padding:6px 8px;text-align:right}
 table.avg td:first-child,table.avg th:first-child{text-align:left}
 
+/* run entry */
+.runbox{display:grid;gap:10px;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.runrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;align-items:end}
+.runrow label,.runpacewrap{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.runrow input{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+.runpace{font-family:var(--display);font-size:20px;color:var(--ink);padding:4px 0}
+
 /* reminders */
 .reminders{display:grid;gap:10px}
 .reminders:empty{display:none}
@@ -534,6 +541,33 @@ function render(){
   renderProgress();
 }
 
+// running: time strings like 30:37 or 1:02:15 <-> minutes
+function parseTime(s){if(!s)return null;const p=String(s).trim().split(":").map(Number);if(p.some(isNaN))return null;if(p.length===3)return p[0]*60+p[1]+p[2]/60;if(p.length===2)return p[0]+p[1]/60;if(p.length===1)return p[0];return null}
+function fmtClock(min){if(min==null||!isFinite(min))return"";let s=Math.round(min*60);const h=Math.floor(s/3600);s-=h*3600;const m=Math.floor(s/60);s-=m*60;return(h?h+":"+String(m).padStart(2,"0"):m)+":"+String(s).padStart(2,"0")}
+function runBox(l){
+  const run=l.run||{};
+  const wrap=el("div",{class:"runbox"});
+  const mi=el("input",{id:"r_miles",type:"number",step:"0.01",inputmode:"decimal",placeholder:"3.02",value:run.miles!=null?String(run.miles):"",disabled:!canWrite()});
+  const tm=el("input",{id:"r_time",type:"text",inputmode:"numeric",placeholder:"30:37",value:run.time||"",disabled:!canWrite()});
+  const pace=el("div",{class:"runpace num"});
+  const calc=()=>{const m=Number(mi.value),t=parseTime(tm.value);pace.textContent=m>0&&t?fmtClock(t/m)+" per mile":"Pace fills in from miles and time"};
+  mi.addEventListener("input",calc);tm.addEventListener("input",calc);calc();
+  const btn=el("button",{class:"btn primary",type:"button",disabled:!canWrite()},run.miles!=null?"Update run":"Save run");
+  btn.addEventListener("click",()=>{
+    const m=mi.value===""?null:Number(mi.value),t=parseTime(tm.value);
+    if(!(m>0)||!t){setStatus("Enter miles and total time, like 3.02 and 30:37.");return}
+    setStatus("");
+    const n=JSON.parse(JSON.stringify(logOf(who,selDate)));n.person=who;n.date=selDate;n.h=n.h||{};
+    n.run={miles:m,time:fmtClock(t),pace:fmtClock(t/m)};
+    if(document.activeElement)document.activeElement.blur();
+    saveLog(n);
+  });
+  wrap.append(el("div",{class:"eyebrow",text:"Your run"}),
+    el("div",{class:"runrow"},el("label",{for:"r_miles"},"Miles",mi),el("label",{for:"r_time"},"Total time",tm),el("div",{class:"runpacewrap"},el("span",{text:"Pace"}),pace)),
+    el("div",null,btn,run.miles!=null?el("span",{class:"hint",style:"margin-left:10px;color:var(--good);font-size:13px",text:"✓ Saved: "+run.miles+" mi, "+run.time+", "+run.pace+"/mi"}):null));
+  return wrap;
+}
+
 // training plan
 let plans={};
 function renderTraining(){
@@ -567,10 +601,14 @@ function renderTraining(){
     const saveSes=patch=>{const n=JSON.parse(JSON.stringify(logOf(who,selDate)));n.person=who;n.date=selDate;n.h=n.h||{};n.session=Object.assign({},n.session||{},patch);saveLog(n)};
     const fr=el("div",{class:"feel",role:"group","aria-label":"How it felt"},el("span",{class:"eyebrow",style:"margin-right:6px",text:"How it felt"}));
     for(let i=1;i<=10;i++){const b=el("button",{type:"button","aria-pressed":String(ses.feel===i),disabled:!canWrite()},String(i));b.addEventListener("click",()=>saveSes({feel:ses.feel===i?null:i}));fr.append(b)}
-    const ta=el("textarea",{id:"t_note",disabled:!canWrite(),placeholder:day.kind==="strength"?"Weights you used, anything that felt off":"Distance, time, anything worth noting"});
-    ta.value=ses.note||"";
-    ta.addEventListener("change",()=>{saveSes({note:ta.value});ta.blur()});
-    t.append(fr,el("label",{class:"tnote",for:"t_note"},"Session notes",ta));
+    if(day.kind==="run"){
+      t.append(fr,runBox(l));
+    }else{
+      const ta=el("textarea",{id:"t_note",disabled:!canWrite(),placeholder:day.kind==="strength"?"Weights you used, anything that felt off":"Anything worth noting"});
+      ta.value=ses.note||"";
+      ta.addEventListener("change",()=>{saveSes({note:ta.value});ta.blur()});
+      t.append(fr,el("label",{class:"tnote",for:"t_note"},"Session notes",ta));
+    }
   }
   box.append(t);
 }
@@ -632,7 +670,8 @@ function lineChart(opt){
   const tip=el("div",{class:"tip",hidden:true});
   for(const s of opt.series){
     const p=s.points.slice().sort((a,b)=>a.x<b.x?-1:1);
-    if(p.length>1)add("path",{d:p.map((q,i)=>(i?"L":"M")+X(q.x)+" "+Y(q.y)).join(" "),fill:"none",stroke:s.color,"stroke-width":2,"stroke-linejoin":"round","stroke-linecap":"round"});
+    if(p.length>1)add("path",{d:p.map((q,i)=>(i?"L":"M")+X(q.x)+" "+Y(q.y)).join(" "),fill:"none",stroke:s.color,"stroke-width":2,"stroke-linejoin":"round","stroke-linecap":"round","stroke-dasharray":s.dashed?"6 5":"none"});
+    if(s.dashed)continue;
     for(const q of p){
       add("circle",{cx:X(q.x),cy:Y(q.y),r:4.5,fill:s.color,stroke:"var(--surface)","stroke-width":2});
       const hit=add("circle",{cx:X(q.x),cy:Y(q.y),r:14,fill:"transparent",tabindex:0});
@@ -644,7 +683,7 @@ function lineChart(opt){
   wrap.append(svg,tip);
   const lg=el("div",{class:"legend"});
   if(opt.series.length>1||opt.pace){
-    for(const s of opt.series){const i=el("i");i.style.background=s.color;lg.append(el("span",null,i,s.name))}
+    for(const s of opt.series){const i=el("i",s.dashed?{class:"dash"}:null);if(!s.dashed)i.style.background=s.color;lg.append(el("span",null,i,s.name))}
     if(opt.pace)lg.append(el("span",null,el("i",{class:"dash"}),opt.pace.label||"On pace"));
     wrap.append(lg);
   }
@@ -654,6 +693,39 @@ function chartPanel(title,sub,chart){
   return el("section",{class:"panel"},el("h2",{text:title}),sub?el("div",{class:"sub",text:sub}):null,chart);
 }
 
+function runsFor(p){
+  const plan=plans[p];if(!plan)return[];
+  const out=[];
+  for(const [k,l] of Object.entries(logs)){
+    if(l.person!==p||!l.run||!(l.run.miles>0))continue;
+    const t=parseTime(l.run.time);if(!t)continue;
+    const wi=Math.floor(daysBetween(plan.start,l.date)/7),di=(parse(l.date).getDay()+6)%7;
+    const day=plan.weeks[wi]&&plan.weeks[wi].days[di];
+    const m=day&&/at (\d+):(\d+)/.exec(day.detail||"");
+    out.push({date:l.date,miles:l.run.miles,min:t,pace:t/l.run.miles,type:di===0?"Easy":di===2?"Moderate":di===4?"Long":"Run",target:m?Number(m[1])+Number(m[2])/60:null,feel:l.session&&l.session.feel});
+  }
+  return out.sort((a,b)=>a.date<b.date?-1:1);
+}
+function renderRunning(cbox,col,name){
+  const runs=runsFor("freddy"), plan=plans.freddy;
+  const mod=runs.filter(r=>r.type==="Moderate");
+  // planned moderate paces from the plan, one per week
+  const tgt=[];
+  plan.weeks.forEach((w,i)=>{const d=w.days[2],m=/at (\d+):(\d+)/.exec(d.detail||"");if(m)tgt.push({x:addDays(plan.start,i*7+2),y:Number(m[1])+Number(m[2])/60})});
+  cbox.append(chartPanel("Moderate run pace (Wednesdays)","The run that's meant to get faster. Lower is faster. Dashed line is the pace the plan calls for each week.",
+    lineChart({label:"moderate pace",series:[{name:"Actual",color:col,points:mod.map(r=>({x:r.date,y:r.pace}))},{name:"Plan",color:"var(--muted)",dashed:true,points:tgt}],fmt:fmtMin,fmtTip:v=>fmtMin(v)+"/mi",empty:"Fills in after Wednesday's run."})));
+  const weeks=[];for(let d=PROGRAM_MONDAY;d<=todayStr;d=addDays(d,7))weeks.push(d);
+  const wm=weeks.map(m=>({x:m,y:Math.round(runs.filter(r=>r.date>=m&&r.date<=addDays(m,6)).reduce((n,r)=>n+r.miles,0)*10)/10}));
+  cbox.append(chartPanel("Miles per week","All logged runs. Should climb slowly and dip on light weeks (4, 8, 12). A sudden jump is how running injuries start.",
+    lineChart({label:"weekly miles",series:[{name,color:col,points:wm}],yMin:0,fmt:v=>Math.round(v),fmtTip:v=>v+" mi",empty:"Fills in once runs are logged."})));
+  const t=el("table",{class:"avg num"});
+  t.append(el("thead",null,el("tr",null,...["Date","Run","Miles","Time","Pace","Plan pace","Feel"].map(h=>el("th",{scope:"col",text:h})))));
+  const tb=el("tbody");
+  for(const r of runs.slice().reverse().slice(0,12))tb.append(el("tr",null,el("td",{text:shortDate(r.date)}),el("td",{text:r.type}),el("td",{text:String(r.miles)}),el("td",{text:fmtClock(r.min)}),el("td",{text:fmtClock(r.pace)}),el("td",{text:r.target?fmtClock(r.target):""}),el("td",{text:r.feel?r.feel+"/10":""})));
+  if(!runs.length)tb.append(el("tr",null,el("td",{colspan:7,text:"No runs logged yet."})));
+  t.append(tb);
+  cbox.append(el("section",{class:"panel"},el("h2",{text:"Recent runs"}),el("div",{class:"tablewrap"},t)));
+}
 function renderProgress(){
   if(tab!=="progress")return;
   const tg=T(who), name=tg.name, col=`var(--${who})`;
@@ -696,8 +768,9 @@ function renderProgress(){
     chartPanel("Estimated body fat (%)","From full tape days (Navy formula). Rough on any single day; useful as a trend.",
       lineChart({label:"body fat",series:[{name,color:col,points:bpts}],fmt:v=>Math.round(v),fmtTip:v=>Math.round(v*10)/10+"%",empty:"Needs a full tape day: neck, "+(who==="freddy"?"belly button waist":"narrowest waist and hips")+"."}))
   );
+  if(plans[who]&&who==="freddy")renderRunning(cbox,col,name);
   const bm=progress&&progress.benchmark&&progress.benchmark[who];
-  if(bm){
+  if(bm&&bm.key!=="run3"){
     const pp=mine.filter(m=>m[bm.key]!=null).map(m=>({x:m.date,y:m[bm.key]}));
     cbox.append(chartPanel(bm.label,bm.note,lineChart({label:bm.label,series:[{name,color:col,points:pp}],fmt:bm.key==="run3"?fmtMin:(v=>Math.round(v)),fmtTip:bm.key==="run3"?fmtMin:(v=>v+" "+(bm.unit||"")),empty:bm.empty})));
   }
@@ -823,10 +896,12 @@ function measureSpec(p,d){
       what:(full?"Full tape this week: neck, both waists, hips, right thigh and right arm, plus weight.":"Just your narrowest waist, plus weight.")+(test?" Push-up test today too.":""),
       sub:"Before you eat. "+(full?"It's a full tape week (every other Friday).":"Just the waist this week; the full tape is every other Friday.")+(test?" Push-up test day: as many as you can in one set, same style every time.":"")+" Weight only if you have a scale."};
   }
-  if(p==="freddy"&&dow===4) return {fields:["belly","neck","chest","hips","thigh","arm","weight"],title:"Friday check-in",
-      what:"Weight, then neck, belly button waist, chest, hips, right thigh and right bicep.",sub:"Before the run, same spots every time. Weight only if you have a scale."};
-  if(p==="freddy"&&dow===2) return {fields:["run3"],title:"3 mile time",what:"Your time at the 3 mile mark.",
-      sub:"After the pace buddy run: your time at the 3 mile mark from Strava (the split, even on longer runs)."};
+  if(p==="freddy"&&dow===4){
+    const full=wi%2===1;
+    return {fields:full?["belly","neck","chest","hips","thigh","arm","weight"]:["belly","weight"],title:full?"Full tape Friday":"Waist check Friday",
+      what:full?"Full tape this week: weight, then neck, belly button waist, chest, hips, right thigh and right bicep.":"Just your belly button waist, plus weight.",
+      sub:"Before the run, same spots every time. "+(full?"It's a full tape week (every other Friday).":"Just the waist this week; the full tape is every other Friday.")+" Weight only if you have a scale."};
+  }
   return null;
 }
 function buildForm(spec){
