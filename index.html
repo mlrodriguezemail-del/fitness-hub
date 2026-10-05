@@ -182,6 +182,18 @@ table.avg td:first-child,table.avg th:first-child{text-align:left}
 .runrow input{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
 .runpace{font-family:var(--display);font-size:20px;color:var(--ink);padding:4px 0}
 
+/* protein tally */
+.protein{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:10px}
+.protein .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.protein .big{font-size:30px}
+.protein .bar i{background:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 10px;cursor:pointer}
+.chips button b{font-weight:700;color:var(--accent)}
+.chips button:disabled{opacity:.45;cursor:default}
+.addrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.addrow input{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:110px}
+
 /* reminders */
 .reminders{display:grid;gap:10px}
 .reminders:empty{display:none}
@@ -268,6 +280,7 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
       <h2 id="todayH">Check in</h2>
       <div class="days" id="days"></div>
       <div class="habits" id="habits"></div>
+      <div class="protein" id="protein"></div>
       <div class="sleep" id="sleep"></div>
       <div class="daytotal"><span id="dayLabel"></span><span class="num" id="dayPts"></span></div>
       <div style="margin-top:18px">
@@ -385,6 +398,47 @@ function streak(p){
   while(pts(logOf(p,iso(d)))>=MAXDAY-1&&n<400){n++;d.setDate(d.getDate()-1)}
   return n;
 }
+// protein: a running tally for the day, so nobody needs a premium food app for it.
+// Saved as the day's protein total; the Protein habit checks itself once the target is reached.
+const PROTEIN_FOODS={
+  maria:[["3 eggs",18],["Palm of chicken or steak",28],["Palm of shrimp",22],["Fairlife milk, 1 cup",13],["Lactose free Greek yogurt",15],["Protein shake",25],["CFA 12 ct grilled nuggets",38],["Beans, 1 cup",15],["Cheese, 1 slice",6],["Jerky, 1 oz",10]],
+  freddy:[["3 eggs",18],["Palm of chicken or steak",28],["2 palms of chicken or steak",55],["Palm of fish or shrimp",24],["Protein shake",25],["Greek yogurt",15],["CFA 12 ct grilled nuggets",38],["Beans, 1 cup",15],["2 tacos (meat)",20],["Jerky, 1 oz",10]]
+};
+function proteinTarget(p){const t=T(p);if(t.proteinTarget)return t.proteinTarget;const m=/(\d+)\s*g/.exec(t.protein||"");return m?Number(m[1]):null}
+function undoKey(){return "habitcup.padds."+who+"."+selDate}
+function getAdds(){try{return JSON.parse(localStorage.getItem(undoKey())||"[]")}catch(e){return[]}}
+function setAdds(a){try{localStorage.setItem(undoKey(),JSON.stringify(a.slice(-30)))}catch(e){}}
+function setProtein(total,addedG){
+  const n=JSON.parse(JSON.stringify(logOf(who,selDate)));n.person=who;n.date=selDate;n.h=n.h||{};
+  n.protein=Math.max(0,Math.round(total));
+  const tgt=proteinTarget(who);
+  if(tgt&&n.protein>=tgt)n.h.protein=true; else if(tgt&&addedG<0&&n.protein<tgt)n.h.protein=false;
+  saveLog(n);
+}
+function renderProtein(l){
+  const box=document.getElementById("protein");
+  if(box.contains(document.activeElement))return;
+  box.replaceChildren();
+  const tot=l.protein||0, tgt=proteinTarget(who), can=canWrite();
+  const b=el("div",{class:"bar"});const i=el("i");i.style.width=(tgt?Math.min(100,Math.round(tot/tgt*100)):0)+"%";b.append(i);
+  const left=tgt?Math.max(0,tgt-tot):null;
+  box.append(
+    el("div",{class:"top"},el("div",null,el("div",{class:"eyebrow",text:"Protein today"}),el("div",{class:"big num"},String(tot)," ",el("small",{text:tgt?"/ "+tgt+" g":"g"}))),
+      el("div",{style:"color:var(--muted);font-size:14px",text:tgt?(left>0?left+" g to go":"Target hit ✓"):""})),b);
+  const add=g=>{if(!can)return;const a=getAdds();a.push(g);setAdds(a);setProtein((logOf(who,selDate).protein||0)+g,g)};
+  if(can){
+    const chips=el("div",{class:"chips"});
+    for(const [label,g] of (PROTEIN_FOODS[who]||PROTEIN_FOODS.maria))chips.append(el("button",{type:"button",onclick:()=>add(g)},label+" ",el("b",{text:"+"+g})));
+    box.append(el("div",{class:"eyebrow",text:"Tap what you ate"}),chips);
+    const ci=el("input",{id:"p_custom",type:"number",inputmode:"numeric",placeholder:"grams"});
+    const addBtn=el("button",{class:"btn",type:"button"},"Add");
+    addBtn.addEventListener("click",()=>{const g=Math.round(Number(ci.value));if(!(g>0)){setStatus("Enter the grams from the label, like 22.");return}setStatus("");ci.value="";ci.blur();add(g)});
+    const adds=getAdds();
+    const undo=el("button",{class:"btn",type:"button",disabled:!adds.length&&!tot},"Undo last");
+    undo.addEventListener("click",()=>{const a=getAdds();const g=a.pop();setAdds(a);if(g)setProtein((logOf(who,selDate).protein||0)-g,-g);else setProtein(0,-tot)});
+    box.append(el("div",{class:"addrow"},el("label",{for:"p_custom",style:"font-size:13px;color:var(--muted)"},"Something else? Grams from the label "),ci,addBtn,undo));
+  }
+}
 function hoursBetween(bed,wake){
   if(!bed||!wake)return null;
   const [bh,bm]=bed.split(":").map(Number),[wh,wm]=wake.split(":").map(Number);
@@ -409,9 +463,9 @@ function renderSleep(l){
     });
     return el("label",{for:id},lab,inp);
   };
-  box.append(mk("s_cal","Calories (from your app)","cal","number"),mk("s_pro","Protein (g)","protein","number"),mk("s_bed","Went to bed (night before)","bedTime"),mk("s_wake","Woke up","wakeTime"));
+  box.append(mk("s_cal","Calories (from your app)","cal","number"),mk("s_bed","Went to bed (night before)","bedTime"),mk("s_wake","Woke up","wakeTime"));
   const h=hoursBetween(l.bedTime,l.wakeTime);
-  box.append(el("div",{class:"hrs num",text:"Optional numbers, copied from your food app, so Claude can see real totals at the weekly check-in. "+(h==null?"":"About "+(Math.round(h*4)/4)+" hours of sleep.")}));
+  box.append(el("div",{class:"hrs num",text:"Calories from your food app, so Claude can see real totals at the weekly check-in. "+(h==null?"":"About "+(Math.round(h*4)/4)+" hours of sleep.")}));
 }
 function allPts(){return Object.values(logs).reduce((n,l)=>n+pts(l),0)}
 function T(p,d){
@@ -490,6 +544,7 @@ function render(){
       el("span",{class:"box","aria-hidden":"true",text:on?"✓":""}),
       el("span",null,el("div",{class:"t",text:h.t}),el("div",{class:"d",text:desc}))));
   }
+  renderProtein(l);
   renderSleep(l);
   document.getElementById("dayLabel").textContent=(selDate===todayStr?"Today":nice(selDate))+", "+tg.name;
   document.getElementById("dayPts").textContent=pts(l)+" of "+MAXDAY+" points";
