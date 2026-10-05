@@ -390,10 +390,15 @@ function renderSleep(l){
   const mk=(id,lab,key,type)=>{
     type=type||"time";
     const inp=el("input",{id,type,inputmode:type==="number"?"numeric":null,value:l[key]!=null?String(l[key]):"",disabled:!canWrite()});
-    inp.addEventListener("change",()=>{
+    // Save only when the person is done with the field (tapping Done or moving on).
+    // iPhone time wheels fire "change" every time the wheel stops, which saved and closed the picker mid-scroll.
+    inp.addEventListener("blur",()=>{
+      const v=inp.value===""?null:(type==="number"?Number(inp.value):inp.value);
+      const cur=logOf(who,selDate)[key];
+      if((cur==null?null:cur)===v)return;
       const n=JSON.parse(JSON.stringify(logOf(who,selDate)));
-      n.person=who;n.date=selDate;n.h=n.h||{};n[key]=inp.value===""?null:(type==="number"?Number(inp.value):inp.value);
-      inp.blur();saveLog(n);
+      n.person=who;n.date=selDate;n.h=n.h||{};n[key]=v;
+      saveLog(n);
     });
     return el("label",{for:id},lab,inp);
   };
