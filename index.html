@@ -286,8 +286,8 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
   </div>
 
   <section class="panel" aria-labelledby="coachH">
-    <h2 id="coachH">Coach's notes and weekly check-in</h2>
-    <div class="sub">Fill this in Sunday night. Claude reads it with your habits and your trend, then posts next week's adjustments here.</div>
+    <h2 id="coachH">This week's focus</h2>
+    <div class="sub" id="coachSub">From your last weekly check-in with Claude.</div>
     <div class="coach" id="coachNotes"></div>
     <div id="checkin"></div>
   </section>
@@ -297,9 +297,9 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
     <div id="weekGrid"></div>
   </section>
 
-  <section class="panel" aria-labelledby="meH">
-    <h2 id="meH">Numbers</h2>
-    <div class="sub" id="meSub">Only you can see this section. No side by side comparisons, just your own trend. Measure every two weeks, in the morning before eating.</div>
+  <section class="panel" aria-labelledby="meH" id="meSec" hidden>
+    <h2 id="meH">Today's numbers</h2>
+    <div class="sub" id="meSub"></div>
     <div id="meBody"></div>
     <div id="meForm"></div>
   </section>
@@ -745,8 +745,8 @@ function renderReminders(){
   const what=full?"Full tape this week: neck, both waists"+(who==="maria"?", hips":"")+", plus weight if you have a scale.":(who==="maria"?"Just your narrowest waist":"Just your belly button waist")+", plus weight if you have a scale.";
   const when=who==="freddy"?"before your run":"before you eat";
   const measured=loaded&&who===me?measures.some(m=>m.person===who&&m.date>=fri&&m.date<=week[6]):null;
-  if(dow===3) add(null,"Tomorrow is measurement day",(full?"It's a full tape week. ":"")+"Leave the tape measure somewhere you'll see it in the morning.",true);
-  if(dow>=4&&measured===false) add(null,dow===4?"Measure this morning, "+name:"Friday's measurement is still open, "+name,(dow===4?"Do it "+when+". ":"Do it first thing tomorrow morning, it still counts. ")+what+" Log it in My numbers below.");
+  const spec=measureSpec(who,todayStr);
+  if(dow===4&&spec&&measured===false) add(null,"Measure this morning, "+name,"Do it "+when+". "+spec.what+" Log it in Today's numbers below.");
   if(dow===6){
     const am=new Date().getHours()<12;
     add(null,am?"Order groceries this morning":"Groceries ordered?",am?"Get the order in early so you can batch cook today and the week's dinners are ready.":"If the order didn't happen this morning, do it now so batch cooking still happens today.");
@@ -754,10 +754,7 @@ function renderReminders(){
     if(!ci) add(null,"Sunday check-in, "+name,"Fill in the weekly check-in below. It takes about a minute. Then open Claude in the Rodriguez Family Brain folder and say \u201cweekly check-in\u201d.");
     else add(null,"Last step: ask Claude","Your check-in is saved. Open Claude in the Rodriguez Family Brain folder and say \u201cweekly check-in\u201d to get next week's notes.");
   }
-  if(dow===5) add(null,"Check-in is tomorrow night","Jot down a win and what got in the way while you still remember.",true);
-  if(dow===0){
-    if(!coach||coach.weekOf!==week[0]) add(null,"No coach's notes for this week yet","If you didn't do the weekly check-in last night, open Claude in the family brain folder and say \u201cweekly check-in\u201d.",true);
-  }
+
 }
 
 // coach notes + weekly check-in
@@ -774,6 +771,10 @@ function renderCoach(){
   }else box.append(el("div",{class:"notice",text:"No notes yet. After your first Sunday check-in, next week's adjustments for "+T(who).name+" show up here."}));
   const key=who+"_"+week[0];
   const ci=document.getElementById("checkin");
+  const sunday=(parse(selDate).getDay()+6)%7===6;
+  document.getElementById("coachSub").textContent=sunday?"Sunday: fill in the weekly check-in below, then ask Claude for your weekly check-in.":"From your last weekly check-in with Claude.";
+  document.getElementById("coachH").textContent=sunday?"This week's focus and Sunday check-in":"This week's focus";
+  if(!sunday||who!==me){ci.replaceChildren();ciFor=null;return}
   if(ciFor!==key){ciFor=key;ciDraft=Object.assign({energy:null,hunger:null,sleep:null,win:"",obstacle:""},checkins[key]||{});buildCheckin()}
   else if(!ci.contains(document.activeElement)&&checkins[key]&&!ciDraft._dirty){ciDraft=Object.assign({},checkins[key]);buildCheckin()}
 }
@@ -801,93 +802,60 @@ function buildCheckin(){
   ci.append(wrap);
 }
 
-// private measurements
+// measurements: only on the days they're due, only the fields due that day
 let formFor=null;
 let goals={};
 const r2=x=>+(+x).toFixed(2);
-function buildForm(){
+const MLABEL={waist:"Waist, narrowest (in)",belly:"Waist at belly button (in)",hips:"Hips, widest (in)",neck:"Neck (in)",chest:"Chest (in)",thigh:"Right thigh (in)",arm:"Right arm (in)",weight:"Weight (lb)",run3:"Time at 3 miles (min, like 28.5)",lift:"Push-ups, max in one set"};
+function weekNum(d){return Math.round((parse(weekDates(d)[0])-parse("2026-10-05"))/864e5/7)}
+function measureSpec(p,d){
+  const dow=(parse(d).getDay()+6)%7, wi=weekNum(d);
+  if(p==="maria"&&dow===4){
+    const full=wi%2===1, test=[0,4,8,11].includes(wi);
+    const f=full?["waist","belly","hips","neck","chest","thigh","arm","weight"]:["waist","weight"];
+    if(test)f.push("lift");
+    return {fields:f,title:full?"Full tape Friday":"Waist check Friday",
+      what:(full?"Full tape this week: neck, both waists, hips, right thigh and right arm, plus weight.":"Just your narrowest waist, plus weight.")+(test?" Push-up test today too.":""),
+      sub:"Before you eat. "+(full?"It's a full tape week (every other Friday).":"Just the waist this week; the full tape is every other Friday.")+(test?" Push-up test day: as many as you can in one set, same style every time.":"")+" Weight only if you have a scale."};
+  }
+  if(p==="freddy"&&dow===4) return {fields:["belly","neck","chest","hips","thigh","arm","weight"],title:"Friday check-in",
+      what:"Weight, then neck, belly button waist, chest, hips, right thigh and right bicep.",sub:"Before the run, same spots every time. Weight only if you have a scale."};
+  if(p==="freddy"&&dow===2) return {fields:["run3"],title:"3 mile time",what:"Your time at the 3 mile mark.",
+      sub:"After the pace buddy run: your time at the 3 mile mark from Strava (the split, even on longer runs)."};
+  return null;
+}
+function buildForm(spec){
   const fbox=document.getElementById("meForm"); fbox.replaceChildren();
-  const tg=T(who);
+  const saved=measures.find(m=>m.person===who&&m.date===selDate)||{};
   const f=el("form",{class:"form",id:"mform"});
-  const fields=[["m_date","Date","date",todayStr],["m_waist","Waist, narrowest (in)","number",""],["m_belly","Waist at belly button (in)","number",""],["m_hips","Hips (in)","number",""],["m_neck","Neck (in)","number",""],["m_chest","Chest (in)","number",""],["m_thigh","Right thigh (in)","number",""],["m_arm","Right arm (in)","number",""],["m_weight","Weight (lb)","number",""]];
-  const bmk=progress&&progress.benchmark&&progress.benchmark[who];
-  fields.push(who==="freddy"?["m_run3",(bmk&&bmk.formLabel)||"3 mile time (min, like 28.5)","number",""]:["m_lift",(bmk&&bmk.formLabel)||"Push-ups, max in one set","number",""]);
-  for(const [id,lab,type,val] of fields){f.append(el("label",{for:id},lab,el("input",{id,type,step:type==="number"?"0.25":null,inputmode:type==="number"?"decimal":null,value:val})))}
-  const btn=el("button",{class:"btn primary",type:"submit",style:"align-self:end"},"Save measurement");
+  for(const k of spec.fields){const id="m_"+k;f.append(el("label",{for:id},MLABEL[k],el("input",{id,type:"number",step:k==="lift"?"1":"0.25",inputmode:"decimal",value:saved[k]!=null?String(saved[k]):""})))}
+  const btn=el("button",{class:"btn primary",type:"submit",style:"align-self:end"},Object.keys(saved).length?"Update":"Save");
   f.append(btn);
   f.addEventListener("submit",async ev=>{
     ev.preventDefault();
-    const g=id=>{const x=document.getElementById(id);return x&&x.value!==""?Number(x.value):null};
-    const date=document.getElementById("m_date").value||todayStr;
-    const row={person:who,date,waist:g("m_waist"),belly:g("m_belly"),hips:g("m_hips"),neck:g("m_neck"),chest:g("m_chest"),thigh:g("m_thigh"),arm:g("m_arm"),weight:g("m_weight"),run3:g("m_run3"),lift:g("m_lift")};
-    if(row.waist==null&&row.belly==null&&row.weight==null&&row.run3==null&&row.lift==null){setStatus("Add at least one number.");return}
+    const row=Object.assign({person:who,date:selDate},saved);
+    let any=false;
+    for(const k of spec.fields){const x=document.getElementById("m_"+k);const v=x&&x.value!==""?Number(x.value):null;if(v!=null)any=true;row[k]=v}
+    for(const k of Object.keys(MLABEL))if(row[k]===undefined)row[k]=null;
+    if(!any){setStatus("Add at least one number.");return}
     btn.disabled=true;
-    try{await post({action:"addMeasurement",measurement:row});measures=measures.filter(m=>!(m.person===who&&m.date===date)).concat([row]);setStatus("");render();f.querySelectorAll('input[type="number"]').forEach(i=>i.value="")}
-    catch(e){setStatus("That measurement didn't save. Try again in a moment.")}
+    try{await post({action:"addMeasurement",measurement:row});if(document.activeElement)document.activeElement.blur();measures=measures.filter(m=>!(m.person===who&&m.date===selDate)).concat([row]);setStatus("");formFor=null;render()}
+    catch(e){setStatus("That didn't save. Try again in a moment.")}
     btn.disabled=false;
   });
-  const gi=el("input",{id:"g_val",type:"number",step:"0.25",inputmode:"decimal",value:goals[who]!=null?String(goals[who]):""});
-  const gb=el("button",{class:"btn",type:"button"},"Save goal");
-  gb.addEventListener("click",async()=>{
-    const v=gi.value===""?null:Number(gi.value);
-    if(v==null){setStatus("Enter a goal number first.");return}
-    gb.disabled=true;
-    try{await post({action:"setGoal",person:who,value:v});goals[who]=v;setStatus("");render()}
-    catch(e){setStatus("That goal didn't save. Try again in a moment.")}
-    gb.disabled=false;
-  });
-  fbox.append(
-    el("div",{class:"eyebrow",style:"margin-top:14px",text:"Log for "+tg.name}),f,
-    el("div",{class:"goalrow"},el("label",{for:"g_val"},"Milestone goal, "+(tg.measureLabel||"waist").toLowerCase()+" (in)",gi),gb)
-  );
+  fbox.append(f);
+  if(Object.keys(saved).length)fbox.append(el("div",{class:"hrs",style:"margin-top:8px;color:var(--good);font-size:14px",text:"✓ Saved for "+shortDate(selDate)+". Your charts are on the Progress tab."}));
 }
 function renderMe(){
-  const tg=T(who);
-  document.getElementById("meSub").textContent=tg.name+"'s measurements. "+(tg.measureEvery||"Measure in the morning before eating")+". Charts are on the Progress tab.";
-  const fbox=document.getElementById("meForm"), body=document.getElementById("meBody");
-  const note=t=>{fbox.replaceChildren();formFor=null;body.replaceChildren(el("div",{class:"notice",style:"margin-top:12px",text:t}))};
-  if(!loaded){note("Connecting…");return}
-  if(who!==me){fbox.replaceChildren();formFor=null}
-  else if(formFor!==who){buildForm();formFor=who}
-  const gi=document.getElementById("g_val");
-  if(gi&&document.activeElement!==gi&&goals[who]!=null)gi.value=String(goals[who]);
-  body.replaceChildren();
-  const key=tg.measure||"waist", label=tg.measureLabel||"Waist";
-  const mine=measures.filter(m=>m.person===who).sort((a,b)=>a.date<b.date?-1:1);
-  const withKey=mine.filter(m=>m[key]!=null);
-  const goal=goals[who];
-  const gbox=el("div",{class:"goal"});
-  if(goal!=null&&withKey.length){
-    const first=withKey[0][key],now=withKey[withKey.length-1][key];
-    const span=first-goal, pct=span>0?Math.max(0,Math.min(100,Math.round((first-now)/span*100))):0;
-    const left=r2(Math.max(0,now-goal));
-    const b=el("div",{class:"bar"});const i=el("i");i.style.width=pct+"%";b.append(i);
-    gbox.append(el("div",{class:"eyebrow",text:"Progress to your milestone"}),
-      el("div",{class:"num",text:label+": "+r2(now)+" in now, started at "+r2(first)+", goal "+r2(goal)+". "+(left>0?left+" in to go.":"Milestone reached!")}),b);
-  }else if(goal!=null){gbox.append(el("div",{class:"num",style:"color:var(--muted)",text:"Goal set at "+r2(goal)+" in. Log a measurement to start the progress bar."}))}
-  else{gbox.append(el("div",{style:"color:var(--muted)",text:"Set a milestone goal below to see a progress bar."}))}
-  body.append(gbox);
-  if(!mine.length){body.append(el("div",{class:"notice",style:"margin-top:14px",text:"No measurements yet. Start with a baseline so you have something to beat."}));return}
-  if(withKey.length>=2) body.append(spark(withKey.map(m=>({d:m.date,v:m[key]})),label+" (in)"));
-  const first=withKey[0];
-  const list=el("div",{class:"mlist"});
-  for(const m of mine.slice().reverse()){
-    const parts=[];
-    if(m.waist!=null)parts.push("waist "+m.waist);
-    if(m.belly!=null)parts.push("belly "+m.belly);
-    if(m.hips!=null)parts.push("hips "+m.hips);
-    if(m.neck!=null)parts.push("neck "+m.neck);
-    if(m.chest!=null)parts.push("chest "+m.chest);
-    if(m.thigh!=null)parts.push("thigh "+m.thigh);
-    if(m.arm!=null)parts.push("arm "+m.arm);
-    if(m.run3!=null)parts.push("3 mi "+fmtMin(m.run3));
-    if(m.lift!=null)parts.push(m.lift+" push-ups");
-    if(m.weight!=null)parts.push(m.weight+" lb");
-    const dv=(first&&m!==first&&m[key]!=null)?r2(m[key]-first[key]):null;
-    list.append(el("div",{class:"mrow"},el("span",null,el("b",{text:parse(m.date).toLocaleDateString(undefined,{month:"short",day:"numeric"})})," ",parts.join(", ")),
-      dv==null?el("span",{class:"num",style:"color:var(--muted)",text:m===first?"baseline":""}):el("span",{class:"num delta "+(dv<=0?"down":"up"),text:(dv>0?"+":"")+dv+" in since start"})));
-  }
-  body.append(list);
+  const sec=document.getElementById("meSec");
+  const spec=loaded&&who===me?measureSpec(who,selDate):null;
+  if(!spec){sec.hidden=true;formFor=null;return}
+  sec.hidden=false;
+  document.getElementById("meH").textContent=spec.title;
+  document.getElementById("meSub").textContent=spec.sub;
+  document.getElementById("meBody").replaceChildren();
+  const k=who+selDate;
+  if(formFor!==k&&!document.getElementById("meForm").contains(document.activeElement)){buildForm(spec);formFor=k}
 }
 function spark(arr,label){
   const W=600,H=140,pl=36,pr=14,pt=16,pb=24;
