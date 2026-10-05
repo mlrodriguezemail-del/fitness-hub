@@ -281,6 +281,7 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
       <div class="days" id="days"></div>
       <div class="habits" id="habits"></div>
       <div class="protein" id="protein"></div>
+      <div class="protein" id="water"></div>
       <div class="sleep" id="sleep"></div>
       <div class="daytotal"><span id="dayLabel"></span><span class="num" id="dayPts"></span></div>
       <div style="margin-top:18px">
@@ -439,6 +440,42 @@ function renderProtein(l){
     box.append(el("div",{class:"addrow"},el("label",{for:"p_custom",style:"font-size:13px;color:var(--muted)"},"Something else? Grams from the label "),ci,addBtn,undo));
   }
 }
+// water: same idea as protein, in ounces. Checks the Water habit at the target.
+const WATER_DRINKS=[["Costco water bottle",16.9],["Large Keurig coffee",12],["Glass of water",8],["Sparkling water can",12]];
+function waterTarget(p){const m=/(\d+)\s*oz/.exec(T(p).water||"");return m?Number(m[1]):null}
+function wKey(){return "habitcup.wadds."+who+"."+selDate}
+function getW(){try{return JSON.parse(localStorage.getItem(wKey())||"[]")}catch(e){return[]}}
+function setW(a){try{localStorage.setItem(wKey(),JSON.stringify(a.slice(-40)))}catch(e){}}
+function setWater(total,added){
+  const n=JSON.parse(JSON.stringify(logOf(who,selDate)));n.person=who;n.date=selDate;n.h=n.h||{};
+  n.water=Math.max(0,Math.round(total*10)/10);
+  const tgt=waterTarget(who);
+  if(tgt&&n.water>=tgt)n.h.water=true; else if(tgt&&added<0&&n.water<tgt)n.h.water=false;
+  saveLog(n);
+}
+function renderWater(l){
+  const box=document.getElementById("water");
+  if(box.contains(document.activeElement))return;
+  box.replaceChildren();
+  const tot=l.water||0, tgt=waterTarget(who), can=canWrite();
+  const b=el("div",{class:"bar"});const i=el("i");i.style.width=(tgt?Math.min(100,Math.round(tot/tgt*100)):0)+"%";b.append(i);
+  const left=tgt?Math.max(0,Math.round((tgt-tot)*10)/10):null;
+  box.append(
+    el("div",{class:"top"},el("div",null,el("div",{class:"eyebrow",text:"Water today"}),el("div",{class:"big num"},String(Math.round(tot*10)/10)," ",el("small",{text:tgt?"/ "+tgt+" oz":"oz"}))),
+      el("div",{style:"color:var(--muted);font-size:14px",text:tgt?(left>0?left+" oz to go":"Target hit ✓"):""})),b);
+  const add=oz=>{if(!can)return;const a=getW();a.push(oz);setW(a);setWater((logOf(who,selDate).water||0)+oz,oz)};
+  if(can){
+    const chips=el("div",{class:"chips"});
+    for(const [label,oz] of WATER_DRINKS)chips.append(el("button",{type:"button",onclick:()=>add(oz)},label+" ",el("b",{text:"+"+oz+" oz"})));
+    box.append(el("div",{class:"eyebrow",text:"Tap what you drank"}),chips);
+    const ci=el("input",{id:"w_custom",type:"number",inputmode:"decimal",placeholder:"ounces"});
+    const addBtn=el("button",{class:"btn",type:"button"},"Add");
+    addBtn.addEventListener("click",()=>{const oz=Math.round(Number(ci.value)*10)/10;if(!(oz>0)){setStatus("Enter the ounces, like 24.");return}setStatus("");ci.value="";ci.blur();add(oz)});
+    const undo=el("button",{class:"btn",type:"button",disabled:!getW().length},"Undo last");
+    undo.addEventListener("click",()=>{const a=getW();const oz=a.pop();setW(a);if(oz)setWater((logOf(who,selDate).water||0)-oz,-oz)});
+    box.append(el("div",{class:"addrow"},el("label",{for:"w_custom",style:"font-size:13px;color:var(--muted)"},"Something else? Ounces "),ci,addBtn,undo));
+  }
+}
 function hoursBetween(bed,wake){
   if(!bed||!wake)return null;
   const [bh,bm]=bed.split(":").map(Number),[wh,wm]=wake.split(":").map(Number);
@@ -545,6 +582,7 @@ function render(){
       el("span",null,el("div",{class:"t",text:h.t}),el("div",{class:"d",text:desc}))));
   }
   renderProtein(l);
+  renderWater(l);
   renderSleep(l);
   document.getElementById("dayLabel").textContent=(selDate===todayStr?"Today":nice(selDate))+", "+tg.name;
   document.getElementById("dayPts").textContent=pts(l)+" of "+MAXDAY+" points";
