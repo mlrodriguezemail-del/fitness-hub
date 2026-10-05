@@ -434,8 +434,8 @@ function renderProtein(l){
     const addBtn=el("button",{class:"btn",type:"button"},"Add");
     addBtn.addEventListener("click",()=>{const g=Math.round(Number(ci.value));if(!(g>0)){setStatus("Enter the grams from the label, like 22.");return}setStatus("");ci.value="";ci.blur();add(g)});
     const adds=getAdds();
-    const undo=el("button",{class:"btn",type:"button",disabled:!adds.length&&!tot},"Undo last");
-    undo.addEventListener("click",()=>{const a=getAdds();const g=a.pop();setAdds(a);if(g)setProtein((logOf(who,selDate).protein||0)-g,-g);else setProtein(0,-tot)});
+    const undo=el("button",{class:"btn",type:"button",disabled:!adds.length},"Undo last");
+    undo.addEventListener("click",()=>{const a=getAdds();const g=a.pop();setAdds(a);if(g)setProtein((logOf(who,selDate).protein||0)-g,-g)});
     box.append(el("div",{class:"addrow"},el("label",{for:"p_custom",style:"font-size:13px;color:var(--muted)"},"Something else? Grams from the label "),ci,addBtn,undo));
   }
 }
