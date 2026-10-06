@@ -529,7 +529,7 @@ function renderSleep(l){
   }
   if(st&&l.steps!=null)notes.append(el("div",{class:"hrs",style:"color:"+(l.steps>=st?"var(--good)":"var(--muted)"),text:l.steps>=st?"✓ Steps goal hit ("+st.toLocaleString()+").":(st-l.steps).toLocaleString()+" steps short of "+st.toLocaleString()+"."}));
   const h=hoursBetween(l.bedTime,l.wakeTime);
-  if(l.bedTime){const tgt=bedTarget(who);notes.append(el("div",{class:"hrs",text:(h!=null?"About "+(Math.round(h*4)/4)+" hours of sleep. ":"")+(tgt!=null?(minsAfterNoon(l.bedTime)<=tgt?"✓ In bed on time last night, so yesterday's Lights out is checked.":"Bed was after your target, so yesterday's Lights out isn't checked."):"")}))}
+  if(l.bedTime&&addDays(selDate,-1)>="2026-10-05"){const tgt=bedTarget(who);notes.append(el("div",{class:"hrs",text:(h!=null?"About "+(Math.round(h*4)/4)+" hours of sleep. ":"")+(tgt!=null?(minsAfterNoon(l.bedTime)<=tgt?"✓ In bed on time last night, so yesterday's Lights out is checked.":"Bed was after your target, so yesterday's Lights out isn't checked."):"")}))}
   notes.append(el("div",{class:"hrs",text:"Enter calories and steps at the end of the day; the habits check themselves. Bedtime is last night's, so it scores yesterday."}));
   box.append(notes);
 }
