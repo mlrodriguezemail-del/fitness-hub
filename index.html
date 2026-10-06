@@ -476,6 +476,8 @@ function renderWater(l){
     box.append(el("div",{class:"addrow"},el("label",{for:"w_custom",style:"font-size:13px;color:var(--muted)"},"Something else? Ounces "),ci,addBtn,undo));
   }
 }
+// calories: range comes from the targets text, like "1,500 (1,400 to 1,600)"
+function calRange(p){const m=/([\d,]+)\s*to\s*([\d,]+)/.exec(T(p).calories||"");return m?{min:Number(m[1].replace(/,/g,"")),max:Number(m[2].replace(/,/g,""))}:null}
 function hoursBetween(bed,wake){
   if(!bed||!wake)return null;
   const [bh,bm]=bed.split(":").map(Number),[wh,wm]=wake.split(":").map(Number);
@@ -496,12 +498,18 @@ function renderSleep(l){
       if((cur==null?null:cur)===v)return;
       const n=JSON.parse(JSON.stringify(logOf(who,selDate)));
       n.person=who;n.date=selDate;n.h=n.h||{};n[key]=v;
+      if(key==="cal"&&v!=null){const r=calRange(who);if(r)n.h.calories=v<=r.max}
       saveLog(n);
     });
     return el("label",{for:id},lab,inp);
   };
   box.append(mk("s_cal","Calories (from your app)","cal","number"),mk("s_bed","Went to bed (night before)","bedTime"),mk("s_wake","Woke up","wakeTime"));
   const h=hoursBetween(l.bedTime,l.wakeTime);
+  const cr=calRange(who);
+  if(cr&&l.cal!=null){
+    const msg=l.cal>cr.max?"Over your "+cr.max.toLocaleString()+" limit today, so the Calories habit stays unchecked.":l.cal<cr.min?"✓ Under your limit. That's on the low side though; make sure it's the whole day's total and don't go much below "+cr.min.toLocaleString()+".":"✓ Within your range, Calories habit checked.";
+    box.append(el("div",{class:"hrs",style:"color:"+(l.cal>cr.max?"var(--warn)":"var(--good)"),text:msg}));
+  }
   box.append(el("div",{class:"hrs num",text:"Calories from your food app, so Claude can see real totals at the weekly check-in. "+(h==null?"":"About "+(Math.round(h*4)/4)+" hours of sleep.")}));
 }
 function allPts(){return Object.values(logs).reduce((n,l)=>n+pts(l),0)}
