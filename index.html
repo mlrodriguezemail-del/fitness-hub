@@ -280,9 +280,9 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
       <h2 id="todayH">Check in</h2>
       <div class="days" id="days"></div>
       <div class="habits" id="habits"></div>
+      <div class="protein" id="sleep"></div>
       <div class="protein" id="protein"></div>
       <div class="protein" id="water"></div>
-      <div class="sleep" id="sleep"></div>
       <div class="daytotal"><span id="dayLabel"></span><span class="num" id="dayPts"></span></div>
       <div style="margin-top:18px">
         <div class="eyebrow">Treat bank this week</div>
@@ -483,13 +483,18 @@ function hoursBetween(bed,wake){
   const [bh,bm]=bed.split(":").map(Number),[wh,wm]=wake.split(":").map(Number);
   let m=(wh*60+wm)-(bh*60+bm); if(m<=0)m+=1440; return m/60;
 }
+// steps target for the selected day, like "8,000 steps" -> 8000
+function stepsTarget(p,d){const m=/(\d{1,2},\d{3}|\d{4,5})/.exec(T(p,d).steps||"");return m?Number(m[1].replace(/,/g,"")):null}
+// lights out target, like "Lights out by 9:30" or "9:15 to 9:30" -> the latest time, as minutes after noon
+function bedTarget(p){const all=[...(T(p).bed||"").matchAll(/(\d{1,2}):(\d{2})/g)];if(!all.length)return null;const m=all[all.length-1];return (Number(m[1])%12)*60+Number(m[2])}
+function minsAfterNoon(t){const [h,m]=t.split(":").map(Number);return ((h+12)%24)*60+m}
 function renderSleep(l){
   const box=document.getElementById("sleep");
   if(box.contains(document.activeElement))return;
   box.replaceChildren();
-  const mk=(id,lab,key,type)=>{
+  const mk=(id,lab,key,type,ph)=>{
     type=type||"time";
-    const inp=el("input",{id,type,inputmode:type==="number"?"numeric":null,value:l[key]!=null?String(l[key]):"",disabled:!canWrite()});
+    const inp=el("input",{id,type,inputmode:type==="number"?"numeric":null,placeholder:ph||null,value:l[key]!=null?String(l[key]):"",disabled:!canWrite()});
     // Save only when the person is done with the field (tapping Done or moving on).
     // iPhone time wheels fire "change" every time the wheel stops, which saved and closed the picker mid-scroll.
     inp.addEventListener("blur",()=>{
@@ -499,18 +504,34 @@ function renderSleep(l){
       const n=JSON.parse(JSON.stringify(logOf(who,selDate)));
       n.person=who;n.date=selDate;n.h=n.h||{};n[key]=v;
       if(key==="cal"&&v!=null){const r=calRange(who);if(r)n.h.calories=v<=r.max}
+      if(key==="steps"&&v!=null){const t=stepsTarget(who,selDate);if(t)n.h.steps=v>=t}
       saveLog(n);
+      // Bedtime logged this morning belongs to last night: it decides yesterday's Lights out habit.
+      if(key==="bedTime"&&v){
+        const tgt=bedTarget(who),prev=addDays(selDate,-1);
+        if(tgt!=null&&prev>="2026-10-05"){const y=JSON.parse(JSON.stringify(logOf(who,prev)));y.person=who;y.date=prev;y.h=y.h||{};y.h.bed=minsAfterNoon(v)<=tgt;saveLog(y)}
+      }
     });
     return el("label",{for:id},lab,inp);
   };
-  box.append(mk("s_cal","Calories (from your app)","cal","number"),mk("s_bed","Went to bed (night before)","bedTime"),mk("s_wake","Woke up","wakeTime"));
-  const h=hoursBetween(l.bedTime,l.wakeTime);
+  const st=stepsTarget(who,selDate);
+  box.append(el("div",{class:"eyebrow",text:"Your numbers today"}),
+    el("div",{class:"sleep"},
+      mk("s_cal","Calories (from Lose It)","cal","number","1,500"),
+      mk("s_steps","Steps (from your phone)","steps","number",st?st.toLocaleString():""),
+      mk("s_bed","Went to bed last night","bedTime"),
+      mk("s_wake","Woke up","wakeTime")));
+  const notes=el("div",{style:"display:grid;gap:4px"});
   const cr=calRange(who);
   if(cr&&l.cal!=null){
-    const msg=l.cal>cr.max?"Over your "+cr.max.toLocaleString()+" limit today, so the Calories habit stays unchecked.":l.cal<cr.min?"✓ Under your limit. That's on the low side though; make sure it's the whole day's total and don't go much below "+cr.min.toLocaleString()+".":"✓ Within your range, Calories habit checked.";
-    box.append(el("div",{class:"hrs",style:"color:"+(l.cal>cr.max?"var(--warn)":"var(--good)"),text:msg}));
+    const msg=l.cal>cr.max?"Calories: over your "+cr.max.toLocaleString()+" limit, so that habit stays unchecked.":l.cal<cr.min?"✓ Calories under your limit. On the low side, though; make sure it's the full day and try not to go much below "+cr.min.toLocaleString()+".":"✓ Calories within your range.";
+    notes.append(el("div",{class:"hrs",style:"color:"+(l.cal>cr.max?"var(--warn)":"var(--good)"),text:msg}));
   }
-  box.append(el("div",{class:"hrs num",text:"Calories from your food app, so Claude can see real totals at the weekly check-in. "+(h==null?"":"About "+(Math.round(h*4)/4)+" hours of sleep.")}));
+  if(st&&l.steps!=null)notes.append(el("div",{class:"hrs",style:"color:"+(l.steps>=st?"var(--good)":"var(--muted)"),text:l.steps>=st?"✓ Steps goal hit ("+st.toLocaleString()+").":(st-l.steps).toLocaleString()+" steps short of "+st.toLocaleString()+"."}));
+  const h=hoursBetween(l.bedTime,l.wakeTime);
+  if(l.bedTime){const tgt=bedTarget(who);notes.append(el("div",{class:"hrs",text:(h!=null?"About "+(Math.round(h*4)/4)+" hours of sleep. ":"")+(tgt!=null?(minsAfterNoon(l.bedTime)<=tgt?"✓ In bed on time last night, so yesterday's Lights out is checked.":"Bed was after your target, so yesterday's Lights out isn't checked."):"")}))}
+  notes.append(el("div",{class:"hrs",text:"Enter calories and steps at the end of the day; the habits check themselves. Bedtime is last night's, so it scores yesterday."}));
+  box.append(notes);
 }
 function allPts(){return Object.values(logs).reduce((n,l)=>n+pts(l),0)}
 function T(p,d){
