@@ -670,14 +670,18 @@ function runBox(l){
   const run=l.run||{};
   const wrap=el("div",{class:"runbox"});
   const mi=el("input",{id:"r_miles",type:"number",step:"0.01",inputmode:"decimal",placeholder:"3.02",value:run.miles!=null?String(run.miles):"",disabled:!canWrite()});
-  const tm=el("input",{id:"r_time",type:"text",inputmode:"numeric",placeholder:"30:37",value:run.time||"",disabled:!canWrite()});
+  const t0=parseTime(run.time);
+  const tmM=el("input",{id:"r_min",type:"number",inputmode:"numeric",step:"1",min:"0",placeholder:"30",value:t0!=null?String(Math.floor(t0+1e-9)):"",disabled:!canWrite()});
+  const tmS=el("input",{id:"r_sec",type:"number",inputmode:"numeric",step:"1",min:"0",max:"59",placeholder:"37",value:t0!=null?String(Math.round((t0-Math.floor(t0+1e-9))*60)):"",disabled:!canWrite()});
+  const tm={get value(){const m=Number(tmM.value||0),sec=Number(tmS.value||0);return (tmM.value===""&&tmS.value==="")?"":m+":"+String(sec).padStart(2,"0")}};
   const pace=el("div",{class:"runpace num"});
   const calc=()=>{const m=Number(mi.value),t=parseTime(tm.value);pace.textContent=m>0&&t?fmtClock(t/m)+" per mile":"Pace fills in from miles and time"};
-  mi.addEventListener("input",calc);tm.addEventListener("input",calc);calc();
+  mi.addEventListener("input",calc);tmM.addEventListener("input",calc);tmS.addEventListener("input",calc);calc();
   const btn=el("button",{class:"btn primary",type:"button",disabled:!canWrite()},run.miles!=null?"Update run":"Save run");
   btn.addEventListener("click",()=>{
     const m=mi.value===""?null:Number(mi.value),t=parseTime(tm.value);
-    if(!(m>0)||!t){setStatus("Enter miles and total time, like 3.02 and 30:37.");return}
+    if(!(m>0)||!t){setStatus("Enter miles, minutes and seconds, like 3.02, 30 and 37.");return}
+    if(Number(tmS.value||0)>59){setStatus("Seconds go up to 59.");return}
     setStatus("");
     const n=JSON.parse(JSON.stringify(logOf(who,selDate)));n.person=who;n.date=selDate;n.h=n.h||{};
     n.run={miles:m,time:fmtClock(t),pace:fmtClock(t/m)};
@@ -685,7 +689,7 @@ function runBox(l){
     saveLog(n);
   });
   wrap.append(el("div",{class:"eyebrow",text:"Your run"}),
-    el("div",{class:"runrow"},el("label",{for:"r_miles"},"Miles",mi),el("label",{for:"r_time"},"Total time",tm),el("div",{class:"runpacewrap"},el("span",{text:"Pace"}),pace)),
+    el("div",{class:"runrow"},el("label",{for:"r_miles"},"Miles",mi),el("label",{for:"r_min"},"Minutes",tmM),el("label",{for:"r_sec"},"Seconds",tmS),el("div",{class:"runpacewrap"},el("span",{text:"Pace"}),pace)),
     el("div",null,btn,run.miles!=null?el("span",{class:"hint",style:"margin-left:10px;color:var(--good);font-size:13px",text:"✓ Saved: "+run.miles+" mi, "+run.time+", "+run.pace+"/mi"}):null));
   return wrap;
 }
@@ -1026,11 +1030,29 @@ function measureSpec(p,d){
   }
   return null;
 }
+const TAPE_RANGE={waist:[24,50],belly:[24,52],hips:[30,56],neck:[10,20],chest:[28,52],thigh:[14,32],arm:[8,20]};
+function quarterLabel(v){const w=Math.floor(v+1e-9),q=Math.round((v-w)*4);return w+(q===1?" ¼":q===2?" ½":q===3?" ¾":"")+" in"}
 function buildForm(spec){
   const fbox=document.getElementById("meForm"); fbox.replaceChildren();
   const saved=measures.find(m=>m.person===who&&m.date===selDate)||{};
   const f=el("form",{class:"form",id:"mform"});
-  for(const k of spec.fields){const id="m_"+k;f.append(el("label",{for:id},MLABEL[k],el("input",{id,type:"number",step:k==="lift"?"1":"0.25",inputmode:"decimal",value:saved[k]!=null?String(saved[k]):""})))}
+  for(const k of spec.fields){
+    const id="m_"+k;let inp;
+    if(TAPE_RANGE[k]){
+      // Tape spots: a picker in quarter inches, like reading a tape measure. Starts on your last reading.
+      const [lo,hi]=TAPE_RANGE[k];
+      const last=measures.filter(m=>m.person===who&&m[k]!=null&&m.date<selDate).sort((a,b)=>a.date<b.date?-1:1).pop();
+      const start=saved[k]!=null?saved[k]:last?last[k]:null;
+      inp=el("select",{id});
+      inp.append(el("option",{value:""},"Pick"+(start!=null?"":"…")));
+      for(let v=lo;v<=hi+1e-9;v+=0.25){const o=el("option",{value:String(v)},quarterLabel(v));if(start!=null&&Math.abs(v-start)<0.01)o.selected=true;inp.append(o)}
+      if(saved[k]==null&&start!=null){inp.value=String(Math.round(start*4)/4);inp.dataset.prefill="1"}
+    }else{
+      inp=el("input",{id,type:"number",step:k==="lift"?"1":"any",inputmode:k==="lift"?"numeric":"decimal",value:saved[k]!=null?String(saved[k]):"",placeholder:k==="weight"?"162.4":""});
+    }
+    f.append(el("label",{for:id},MLABEL[k],inp));
+  }
+  if(!Object.keys(saved).length)f.append(el("div",{class:"hrs",style:"grid-column:1/-1",text:"The pickers start on your last reading; adjust each one to today's number."}));
   const btn=el("button",{class:"btn primary",type:"submit",style:"align-self:end"},Object.keys(saved).length?"Update":"Save");
   f.append(btn);
   f.addEventListener("submit",async ev=>{
