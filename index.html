@@ -281,6 +281,7 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
       <div class="days" id="days"></div>
       <div class="habits" id="habits"></div>
       <div class="protein" id="sleep"></div>
+      <div class="protein" id="calories"></div>
       <div class="protein" id="protein"></div>
       <div class="protein" id="water"></div>
       <div class="daytotal"><span id="dayLabel"></span><span class="num" id="dayPts"></span></div>
@@ -407,47 +408,65 @@ const FOODS={
   freddy:[["3 eggs",210,18],["Palm of chicken",160,28],["2 palms of chicken",320,55],["Palm of steak",250,28],["Palm of fish or shrimp",130,24],["Protein shake",130,25],["Greek yogurt",130,15],["CFA 12 ct grilled nuggets",200,38],["2 meat tacos",340,20],["Beans, 1 cup",230,15],["Rice, 1 fist",200,4],["Corn tortilla",60,1],["Jerky, 1 oz",80,10],["Fruit",60,1],["Pizza, 1 slice",285,12]]
 };
 function proteinTarget(p){const t=T(p);if(t.proteinTarget)return t.proteinTarget;const m=/(\d+)\s*g/.exec(t.protein||"");return m?Number(m[1]):null}
-function fKey(){return "habitcup.fadds."+who+"."+selDate}
-function getF(){try{return JSON.parse(localStorage.getItem(fKey())||"[]")}catch(e){return[]}}
-function setF(a){try{localStorage.setItem(fKey(),JSON.stringify(a.slice(-60)))}catch(e){}}
-function addFood(dc,dp,done){
+function calTarget(p){const m=/^([\d,]+)/.exec((T(p).calories||"").trim());return m?Number(m[1].replace(/,/g,"")):null}
+function stackKey(kind){return "habitcup."+kind+"."+who+"."+selDate}
+function getStack(kind){try{return JSON.parse(localStorage.getItem(stackKey(kind))||"[]")}catch(e){return[]}}
+function setStack(kind,a){try{localStorage.setItem(stackKey(kind),JSON.stringify(a.slice(-60)))}catch(e){}}
+function addCal(dc,done){
   const n=JSON.parse(JSON.stringify(logOf(who,selDate)));n.person=who;n.date=selDate;n.h=n.h||{};
-  n.cal=Math.max(0,Math.round((n.cal||0)+dc)); n.protein=Math.max(0,Math.round((n.protein||0)+dp));
-  const tgt=proteinTarget(who), cr=calRange(who);
-  if(tgt&&n.protein>=tgt)n.h.protein=true; else if(tgt&&dp<0&&n.protein<tgt)n.h.protein=false;
-  if(cr&&n.cal>cr.max)n.h.calories=false;           // over is over, any time of day
-  if(done&&cr)n.h.calories=n.cal>0&&n.cal<=cr.max;  // under only counts once the day is done
+  n.cal=Math.max(0,Math.round((n.cal||0)+dc));
+  const cr=calRange(who);
+  if(cr&&n.cal>cr.max)n.h.calories=false;            // over is over, any time of day
+  if(done&&cr)n.h.calories=n.cal>0&&n.cal<=cr.max;   // under only counts once the day is done
   saveLog(n);
+}
+function addPro(dp){
+  const n=JSON.parse(JSON.stringify(logOf(who,selDate)));n.person=who;n.date=selDate;n.h=n.h||{};
+  n.protein=Math.max(0,Math.round((n.protein||0)+dp));
+  const tgt=proteinTarget(who);
+  if(tgt&&n.protein>=tgt)n.h.protein=true; else if(tgt&&dp<0&&n.protein<tgt)n.h.protein=false;
+  saveLog(n);
+}
+function meter(label,val,goal,unit,note,warn){
+  const b=el("div",{class:"bar"});const i=el("i");i.style.width=(goal?Math.min(100,Math.round(val/goal*100)):0)+"%";if(warn)i.style.background="var(--warn)";b.append(i);
+  return [el("div",{class:"top"},el("div",null,el("div",{class:"eyebrow",text:label}),el("div",{class:"big num"},val.toLocaleString()," ",el("small",{text:goal?"/ "+goal.toLocaleString()+" "+unit:unit}))),el("div",{style:"color:"+(warn?"var(--warn)":"var(--muted)")+";font-size:14px",text:note})),b];
+}
+function tallyControls(box,kind,idx,unitLabel,ph,apply){
+  const chips=el("div",{class:"chips"});
+  for(const f of (FOODS[who]||FOODS.maria)){const v=f[idx];if(!v)continue;chips.append(el("button",{type:"button",onclick:()=>{const a=getStack(kind);a.push(v);setStack(kind,a);apply(v)}},f[0]+" ",el("b",{text:"+"+v+unitLabel})))}
+  box.append(el("div",{class:"eyebrow",text:"Tap what you ate (estimates)"}),chips);
+  const inp=el("input",{id:kind+"_custom",type:"number",inputmode:"numeric",placeholder:ph});
+  const add=el("button",{class:"btn",type:"button"},"Add");
+  add.addEventListener("click",()=>{const v=Math.round(Number(inp.value));if(!(v>0)){setStatus("Enter a number from the label or Lose It.");return}setStatus("");inp.value="";inp.blur();const a=getStack(kind);a.push(v);setStack(kind,a);apply(v)});
+  const undo=el("button",{class:"btn",type:"button",disabled:!getStack(kind).length},"Undo last");
+  undo.addEventListener("click",()=>{const a=getStack(kind);const v=a.pop();setStack(kind,a);if(v)apply(-v)});
+  box.append(el("div",{class:"addrow"},el("label",{for:kind+"_custom",style:"font-size:13px;color:var(--muted)"},"Something else? "),inp,add,undo));
+}
+function renderCalories(l){
+  const box=document.getElementById("calories");
+  if(box.contains(document.activeElement))return;
+  box.replaceChildren();
+  const cal=l.cal||0, cr=calRange(who), tg=calTarget(who), can=canWrite();
+  const over=cr&&cal>cr.max, left=tg!=null?tg-cal:null;
+  const note=tg==null?"":over?(cal-cr.max).toLocaleString()+" over your "+cr.max.toLocaleString()+" limit":left>=0?left.toLocaleString()+" left":"Over target, still counts up to "+cr.max.toLocaleString();
+  box.append(...meter("Calories today",cal,tg,"target",note,over));
+  if(cr)box.append(el("div",{class:"hrs",text:"Target "+tg.toLocaleString()+". The habit counts anywhere up to "+cr.max.toLocaleString()+"."}));
+  if(!can)return;
+  tallyControls(box,"cadds",1," cal","calories",v=>addCal(v));
+  const checked=!!(l.h&&l.h.calories);
+  const done=el("button",{class:"btn primary",type:"button",disabled:!cal},checked?"✓ Day closed, calories counted":"Done eating for today");
+  done.addEventListener("click",()=>addCal(0,true));
+  const low=checked&&cr&&cal<cr.min?el("div",{class:"hrs",style:"color:var(--warn)",text:"Closed under "+cr.min.toLocaleString()+". That's on the low side; make sure everything got logged."}):null;
+  box.append(el("div",{style:"display:grid;gap:4px"},done,low,el("div",{class:"hrs",text:"Tap Done after your last bite; that's when the Calories habit gets checked. Going over the limit unchecks it any time. Have the day's total from Lose It? Type it in and tap Add, then Done."})));
 }
 function renderProtein(l){
   const box=document.getElementById("protein");
   if(box.contains(document.activeElement))return;
   box.replaceChildren();
-  const cal=l.cal||0, pro=l.protein||0, tgt=proteinTarget(who), cr=calRange(who), can=canWrite();
-  const meter=(label,val,goal,unit,note,warn)=>{
-    const b=el("div",{class:"bar"});const i=el("i");i.style.width=(goal?Math.min(100,Math.round(val/goal*100)):0)+"%";if(warn)i.style.background="var(--warn)";b.append(i);
-    return el("div",{style:"display:grid;gap:4px"},el("div",{class:"top"},el("div",null,el("div",{class:"eyebrow",text:label}),el("div",{class:"big num"},val.toLocaleString()," ",el("small",{text:goal?"/ "+goal.toLocaleString()+" "+unit:unit}))),el("div",{style:"color:"+(warn?"var(--warn)":"var(--muted)")+";font-size:14px",text:note})),b);
-  };
-  const left=cr?cr.max-cal:null;
-  box.append(el("div",{class:"eyebrow",style:"font-size:13px;color:var(--ink)",text:"Food today"}),
-    meter("Calories",cal,cr&&cr.max,"limit",cr?(left>=0?left.toLocaleString()+" left":Math.abs(left).toLocaleString()+" over"):"",cr&&cal>cr.max),
-    meter("Protein",pro,tgt,"g",tgt?(pro>=tgt?"Target hit ✓":(tgt-pro)+" g to go"):"",false));
-  if(!can)return;
-  const chips=el("div",{class:"chips"});
-  for(const [label,c,p] of (FOODS[who]||FOODS.maria))chips.append(el("button",{type:"button",onclick:()=>{const a=getF();a.push([c,p]);setF(a);addFood(c,p)}},label+" ",el("b",{text:c+" cal · "+p+" g"})));
-  box.append(el("div",{class:"eyebrow",text:"Tap what you ate (estimates)"}),chips);
-  const ci=el("input",{id:"f_cal",type:"number",inputmode:"numeric",placeholder:"calories"});
-  const pi=el("input",{id:"f_pro",type:"number",inputmode:"numeric",placeholder:"protein g"});
-  const addBtn=el("button",{class:"btn",type:"button"},"Add");
-  addBtn.addEventListener("click",()=>{const c=Math.round(Number(ci.value||0)),p=Math.round(Number(pi.value||0));if(!(c>0||p>0)){setStatus("Enter calories, protein or both from the label or Lose It.");return}setStatus("");ci.value="";pi.value="";if(document.activeElement)document.activeElement.blur();const a=getF();a.push([c,p]);setF(a);addFood(c,p)});
-  const undo=el("button",{class:"btn",type:"button",disabled:!getF().length},"Undo last");
-  undo.addEventListener("click",()=>{const a=getF();const x=a.pop();setF(a);if(x)addFood(-x[0],-x[1])});
-  box.append(el("div",{class:"addrow"},el("label",{for:"f_cal",style:"font-size:13px;color:var(--muted)"},"Something else? "),ci,pi,addBtn,undo));
-  const checked=!!(l.h&&l.h.calories);
-  const done=el("button",{class:"btn primary",type:"button",disabled:!cal},checked?"✓ Day closed, calories counted":"Done eating for today");
-  done.addEventListener("click",()=>addFood(0,0,true));
-  const low=checked&&cr&&cal<cr.min?el("div",{class:"hrs",style:"color:var(--warn)",text:"Closed under "+cr.min.toLocaleString()+". That's on the low side; make sure everything got logged, and aim for "+cr.min.toLocaleString()+" to "+cr.max.toLocaleString()+" most days."}):null;
-  box.append(el("div",{style:"display:grid;gap:4px"},done,low,el("div",{class:"hrs",text:cr?"Tap this after your last bite. Under "+cr.max.toLocaleString()+" checks the Calories habit; going over unchecks it any time. Already have the day's total from Lose It? Type it in the calories box and tap Add, then Done.":""})));
+  const pro=l.protein||0, tgt=proteinTarget(who);
+  box.append(...meter("Protein today",pro,tgt,"g",tgt?(pro>=tgt?"Target hit ✓":(tgt-pro)+" g to go"):"",false));
+  if(!canWrite())return;
+  tallyControls(box,"padds2",2," g","grams",v=>addPro(v));
 }
 // water: same idea as protein, in ounces. Checks the Water habit at the target.
 const WATER_DRINKS=[["Costco water bottle",16.9],["Large Keurig coffee",12],["Glass of water",8],["Sparkling water can",12]];
@@ -613,6 +632,7 @@ function render(){
       el("span",{class:"box","aria-hidden":"true",text:on?"✓":""}),
       el("span",null,el("div",{class:"t",text:h.t}),el("div",{class:"d",text:desc}))));
   }
+  renderCalories(l);
   renderProtein(l);
   renderWater(l);
   renderSleep(l);
