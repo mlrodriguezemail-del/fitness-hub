@@ -512,7 +512,7 @@ function hoursBetween(bed,wake){
   let m=(wh*60+wm)-(bh*60+bm); if(m<=0)m+=1440; return m/60;
 }
 // steps target for the selected day, like "8,000 steps" -> 8000
-function stepsTarget(p,d){const m=/(\d{1,2},\d{3}|\d{4,5})/.exec(T(p,d).steps||"");return m?Number(m[1].replace(/,/g,"")):null}
+function stepsTarget(p,d){const t=T(p,d);if(t.stepsByDay){const v=t.stepsByDay[(parse(d).getDay()+6)%7];if(v)return v}const m=/(\d{1,2},\d{3}|\d{4,5})/.exec(T(p,d).steps||"");return m?Number(m[1].replace(/,/g,"")):null}
 // lights out target, like "Lights out by 9:30" or "9:15 to 9:30" -> the latest time, as minutes after noon
 function bedTarget(p){const all=[...(T(p).bed||"").matchAll(/(\d{1,2}):(\d{2})/g)];if(!all.length)return null;const m=all[all.length-1];return (Number(m[1])%12)*60+Number(m[2])}
 function minsAfterNoon(t){const [h,m]=t.split(":").map(Number);return ((h+12)%24)*60+m}
@@ -628,6 +628,7 @@ function render(){
     const on=!!(l.h&&l.h[h.k]);
     let desc=tg[h.k]||"";
     if(h.k==="workout"&&tg.workoutByDay&&tg.workoutByDay[di]) desc=tg.workoutByDay[di]+". "+(tg.restNote||REST);
+    if(h.k==="steps"&&tg.stepsByDay&&tg.stepsByDay[di]) desc=tg.stepsByDay[di].toLocaleString()+" steps today"+(tg.stepsNote?" ("+tg.stepsNote+")":"");
     hb.append(el("button",{class:"habit","aria-pressed":String(on),disabled:!canWrite(),onclick:()=>toggle(h.k)},
       el("span",{class:"box","aria-hidden":"true",text:on?"✓":""}),
       el("span",null,el("div",{class:"t",text:h.t}),el("div",{class:"d",text:desc}))));
