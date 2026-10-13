@@ -194,6 +194,11 @@ table.avg td:first-child,table.avg th:first-child{text-align:left}
 .addrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .addrow input{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:110px}
 
+/* lifting */
+.liftrow{display:grid;grid-template-columns:1fr 90px 150px;gap:8px;align-items:center;border-top:1px solid var(--line);padding-top:8px}
+@media (max-width:520px){.liftrow{grid-template-columns:1fr 1fr}.liftrow>div:first-child{grid-column:1/-1}}
+.liftrow input,.liftrow select{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+
 /* reminders */
 .reminders{display:grid;gap:10px}
 .reminders:empty{display:none}
@@ -718,6 +723,55 @@ function runBox(l){
   return wrap;
 }
 
+// lifting: weight per exercise plus how it felt, and a suggestion for next time.
+// Progression rule (double progression, simplified): easy -> go up one step; too heavy -> come down one step;
+// just right -> repeat, and go up after two solid sessions in a row at the same weight.
+const FEEL=[["easy","Easy, 2+ reps left"],["right","Just right"],["hard","Too heavy"]];
+function liftHistory(p,name,before){
+  const out=[];
+  for(const l of Object.values(logs)){if(l.person!==p||!l.lifts||(before&&l.date>=before))continue;for(const x of l.lifts)if(x.n===name&&x.w!=null)out.push({date:l.date,w:x.w,f:x.f})}
+  return out.sort((a,b)=>a.date<b.date?-1:1);
+}
+function suggestLift(p,lift,before){
+  const h=liftHistory(p,lift.n,before), last=h[h.length-1], prev=h[h.length-2], inc=lift.inc||5;
+  if(!last)return lift.plan?{w:lift.plan,why:"plan weight for this week"}:{w:null,why:"first time: pick a weight where the last 2 reps are hard"};
+  if(last.f==="easy")return {w:last.w+inc,why:"felt easy last time ("+last.w+")"};
+  if(last.f==="hard")return {w:Math.max(0,last.w-inc),why:"too heavy last time ("+last.w+")"};
+  if(last.f==="right"&&prev&&prev.w===last.w&&prev.f==="right")return {w:last.w+inc,why:"two solid sessions at "+last.w};
+  return {w:last.w,why:last.f==="right"?"repeat "+last.w+"; one more solid session, then go up":"same as last time"};
+}
+function liftBox(day,l){
+  const wrap=el("div",{class:"runbox"});
+  const saved={};for(const x of (l.lifts||[]))saved[x.n]=x;
+  const can=canWrite(), rows=[];
+  wrap.append(el("div",{class:"eyebrow",text:"Weights today (lb)"}));
+  for(const lift of day.lifts){
+    const sg=suggestLift(who,lift,selDate), sv=saved[lift.n]||{};
+    const wi=el("input",{type:"number",step:"any",inputmode:"decimal",placeholder:sg.w!=null?String(sg.w):"lb",value:sv.w!=null?String(sv.w):"",disabled:!can,"aria-label":lift.n+" weight"});
+    const fs=el("select",{disabled:!can,"aria-label":lift.n+" how it felt"},el("option",{value:""},"How it felt"));
+    for(const [v,lab] of FEEL){const o=el("option",{value:v},lab);if(sv.f===v)o.selected=true;fs.append(o)}
+    rows.push([lift,wi,fs]);
+    wrap.append(el("div",{class:"liftrow"},
+      el("div",null,el("b",{text:lift.n}),el("div",{class:"hrs",text:(lift.unit?lift.unit+". ":"")+(sg.w!=null?"Try "+sg.w+": "+sg.why:sg.why)+(lift.plan&&sg.w!==lift.plan?" (plan says "+lift.plan+")":"")})),
+      wi,fs));
+  }
+  if(can){
+    const any=Object.keys(saved).length>0;
+    const btn=el("button",{class:"btn primary",type:"button"},any?"Update weights":"Save weights");
+    btn.addEventListener("click",()=>{
+      const lifts=rows.map(([lift,wi,fs])=>({n:lift.n,w:wi.value===""?null:Number(wi.value),f:fs.value||null})).filter(x=>x.w!=null||x.f);
+      if(!lifts.length){setStatus("Enter at least one weight.");return}
+      setStatus("");
+      const n=JSON.parse(JSON.stringify(logOf(who,selDate)));n.person=who;n.date=selDate;n.h=n.h||{};n.lifts=lifts;
+      if(document.activeElement)document.activeElement.blur();
+      saveLog(n);
+    });
+    wrap.append(el("div",null,btn,any?el("span",{class:"hint",style:"margin-left:10px;color:var(--good);font-size:13px",text:"✓ Saved"}):null),
+      el("div",{class:"hrs",text:"The gray number is today's suggestion. Rate each one so next time's suggestion adjusts: easy goes up, too heavy comes down, just right twice in a row goes up."}));
+  }
+  return wrap;
+}
+
 // training plan
 let plans={};
 function renderTraining(){
@@ -754,7 +808,8 @@ function renderTraining(){
     if(day.kind==="run"){
       t.append(fr,runBox(l));
     }else{
-      const ta=el("textarea",{id:"t_note",disabled:!canWrite(),placeholder:day.kind==="strength"?"Weights you used, anything that felt off":"Anything worth noting"});
+      if(day.lifts&&day.lifts.length)t.append(liftBox(day,l));
+      const ta=el("textarea",{id:"t_note",disabled:!canWrite(),placeholder:day.kind==="strength"?"Anything that felt off, swaps you made":"Anything worth noting"});
       ta.value=ses.note||"";
       ta.addEventListener("change",()=>{saveSes({note:ta.value});ta.blur()});
       t.append(fr,el("label",{class:"tnote",for:"t_note"},"Session notes",ta));
@@ -856,6 +911,23 @@ function runsFor(p){
   }
   return out.sort((a,b)=>a.date<b.date?-1:1);
 }
+function renderStrength(cbox){
+  const plan=plans[who];if(!plan)return;
+  const lifts=[],seen={};
+  for(const w of plan.weeks)for(const d of w.days)for(const x of (d.lifts||[]))if(!seen[x.n]){seen[x.n]=1;lifts.push(x)}
+  if(!lifts.length)return;
+  const t=el("table",{class:"avg num"});
+  t.append(el("thead",null,el("tr",null,...["Exercise","First","Latest","Change","Next time"].map(h=>el("th",{scope:"col",text:h})))));
+  const tb=el("tbody");let rowsN=0;
+  for(const lift of lifts){
+    const h=liftHistory(who,lift.n);if(!h.length)continue;rowsN++;
+    const f=h[0],l=h[h.length-1],sg=suggestLift(who,lift,addDays(todayStr,1)),ch=l.w-f.w;
+    tb.append(el("tr",null,el("td",{text:lift.n}),el("td",{text:f.w+" ("+shortDate(f.date)+")"}),el("td",{text:l.w+(l.f?" · "+(FEEL.find(x=>x[0]===l.f)||["",""])[1].split(",")[0].toLowerCase():"")}),el("td",{text:(ch>0?"+":"")+ch,style:"color:"+(ch>0?"var(--good)":ch<0?"var(--warn)":"var(--muted)")}),el("td",{text:sg.w!=null?String(sg.w):""})));
+  }
+  if(!rowsN)tb.append(el("tr",null,el("td",{colspan:5,text:"No weights logged yet. They fill in from the training card on lifting days."})));
+  t.append(tb);
+  cbox.append(el("section",{class:"panel"},el("h2",{text:"Strength"}),el("div",{class:"sub",text:"Weights going up, or holding, while the waist comes down means you're losing fat and keeping muscle."}),el("div",{class:"tablewrap"},t)));
+}
 function renderRunning(cbox,col,name){
   const runs=runsFor("freddy"), plan=plans.freddy;
   const mod=runs.filter(r=>r.type==="Moderate");
@@ -919,6 +991,7 @@ function renderProgress(){
       lineChart({label:"body fat",series:[{name,color:col,points:bpts}],fmt:v=>Math.round(v),fmtTip:v=>Math.round(v*10)/10+"%",empty:"Needs a full tape day: neck, "+(who==="freddy"?"belly button waist":"narrowest waist and hips")+"."}))
   );
   if(plans[who]&&who==="freddy")renderRunning(cbox,col,name);
+  renderStrength(cbox);
   const bm=progress&&progress.benchmark&&progress.benchmark[who];
   if(bm&&bm.key!=="run3"){
     const pp=mine.filter(m=>m[bm.key]!=null).map(m=>({x:m.date,y:m[bm.key]}));
