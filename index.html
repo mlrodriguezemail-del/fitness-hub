@@ -286,6 +286,7 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
       <div class="days" id="days"></div>
       <div class="habits" id="habits"></div>
       <div class="protein" id="sleep"></div>
+      <div class="protein" id="meals"></div>
       <div class="protein" id="calories"></div>
       <div class="protein" id="protein"></div>
       <div class="protein" id="water"></div>
@@ -446,6 +447,34 @@ function tallyControls(box,kind,idx,unitLabel,ph,apply){
   const undo=el("button",{class:"btn",type:"button",disabled:!getStack(kind).length},"Undo last");
   undo.addEventListener("click",()=>{const a=getStack(kind);const v=a.pop();setStack(kind,a);if(v)apply(-v)});
   box.append(el("div",{class:"addrow"},el("label",{for:kind+"_custom",style:"font-size:13px;color:var(--muted)"},"Something else? "),inp,add,undo));
+}
+// our meals: batch cooked and go-to meals Freddy and Maria share. One tap adds to calories AND protein.
+// The list lives in Config (targets.meals: [{name, cal, protein, half}]) so Claude can add meals without code changes.
+function renderMeals(l){
+  const box=document.getElementById("meals");
+  box.replaceChildren();
+  const meals=(targets.meals||[]).filter(m=>!m.who||m.who===who);
+  if(!meals.length||!canWrite()){box.hidden=true;return}
+  box.hidden=false;
+  const both=(c,p)=>{const a=getStack("madds");a.push([c,p]);setStack("madds",a);addCalPro(c,p)};
+  box.append(el("div",{class:"eyebrow",style:"font-size:13px;color:var(--ink)",text:"Our meals"}),el("div",{class:"hrs",text:"One tap adds to both calories and protein."}));
+  const chips=el("div",{class:"chips"});
+  for(const m of meals){
+    chips.append(el("button",{type:"button",onclick:()=>both(m.cal,m.protein)},m.name+" ",el("b",{text:m.cal+" cal · "+m.protein+" g"})));
+    if(m.half!==false){const hc=Math.round(m.cal/2),hp=Math.round(m.protein/2);chips.append(el("button",{type:"button",onclick:()=>both(hc,hp)},"½ "+m.name+" ",el("b",{text:hc+" cal · "+hp+" g"})))}
+  }
+  box.append(chips);
+  const undo=el("button",{class:"btn",type:"button",disabled:!getStack("madds").length},"Undo last meal");
+  undo.addEventListener("click",()=>{const a=getStack("madds");const x=a.pop();setStack("madds",a);if(x)addCalPro(-x[0],-x[1])});
+  box.append(el("div",null,undo));
+}
+function addCalPro(dc,dp){
+  const n=JSON.parse(JSON.stringify(logOf(who,selDate)));n.person=who;n.date=selDate;n.h=n.h||{};
+  n.cal=Math.max(0,Math.round((n.cal||0)+dc)); n.protein=Math.max(0,Math.round((n.protein||0)+dp));
+  const cr=calRange(who), tgt=proteinTarget(who);
+  if(cr&&n.cal>cr.max)n.h.calories=false;
+  if(tgt&&n.protein>=tgt)n.h.protein=true; else if(tgt&&dp<0&&n.protein<tgt)n.h.protein=false;
+  saveLog(n);
 }
 function renderCalories(l){
   const box=document.getElementById("calories");
@@ -638,6 +667,7 @@ function render(){
       el("span",{class:"box","aria-hidden":"true",text:on?"✓":""}),
       el("span",null,el("div",{class:"t",text:h.t}),el("div",{class:"d",text:desc}))));
   }
+  renderMeals(l);
   renderCalories(l);
   renderProtein(l);
   renderWater(l);
@@ -1227,7 +1257,7 @@ async function fetchSnapshot(){
 }
 function apply(d){
   me=d.me;
-  if(d.targets)targets={people:Object.assign({},DEFAULT_TARGETS.people,d.targets.people||{}),rewards:d.rewards||d.targets.rewards||DEFAULT_TARGETS.rewards};
+  if(d.targets)targets={people:Object.assign({},DEFAULT_TARGETS.people,d.targets.people||{}),rewards:d.rewards||d.targets.rewards||DEFAULT_TARGETS.rewards,meals:d.targets.meals||[]};
   plans=d.plans||{};coach=d.coach||null;progress=d.progress||null;checkins=d.checkins||{};measures=d.measures||[];goals=d.goals||{};
   if(Date.now()-lastWrite>8000) logs=d.logs||{};
   loaded=true;
