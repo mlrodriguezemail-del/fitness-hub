@@ -538,6 +538,8 @@ function renderWater(l){
   const add=oz=>{if(!can)return;const a=getW();a.push(oz);setW(a);setWater((logOf(who,selDate).water||0)+oz,oz)};
   if(can){
     const chips=el("div",{class:"chips"});
+    // Their own meals and drinks that include water (Config targets.meals with a water field) come first.
+    for(const m of (targets.meals||[]).filter(m=>(!m.who||m.who===who)&&m.water))chips.append(el("button",{type:"button",onclick:()=>add(m.water)},m.name+" ",el("b",{text:"+"+m.water+" oz"})));
     for(const [label,oz] of WATER_DRINKS)chips.append(el("button",{type:"button",onclick:()=>add(oz)},label+" ",el("b",{text:"+"+oz+" oz"})));
     box.append(el("div",{class:"eyebrow",text:"Tap what you drank"}),chips);
     const ci=el("input",{id:"w_custom",type:"number",inputmode:"decimal",placeholder:"ounces"});
