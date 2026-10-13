@@ -288,7 +288,6 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
       <div class="days" id="days"></div>
       <div class="habits" id="habits"></div>
       <div class="protein" id="sleep"></div>
-      <div class="protein" id="meals"></div>
       <div class="protein" id="calories"></div>
       <div class="protein" id="protein"></div>
       <div class="protein" id="water"></div>
@@ -440,9 +439,18 @@ function meter(label,val,goal,unit,note,warn){
   return [el("div",{class:"top"},el("div",null,el("div",{class:"eyebrow",text:label}),el("div",{class:"big num"},val.toLocaleString()," ",el("small",{text:goal?"/ "+goal.toLocaleString()+" "+unit:unit}))),el("div",{style:"color:"+(warn?"var(--warn)":"var(--muted)")+";font-size:14px",text:note})),b];
 }
 function tallyControls(box,kind,idx,unitLabel,ph,apply){
-  const chips=el("div",{class:"chips"});
-  for(const f of (FOODS[who]||FOODS.maria)){const v=f[idx];if(!v)continue;chips.append(el("button",{type:"button",onclick:()=>{const a=getStack(kind);a.push(v);setStack(kind,a);apply(v)}},f[0]+" ",el("b",{text:"+"+v+unitLabel})))}
-  box.append(el("div",{class:"eyebrow",text:"Tap what you ate (estimates)"}),chips);
+  // Buttons come from their own meals list (Config targets.meals), whole and half, not generic foods.
+  const field=idx===1?"cal":"protein";
+  const meals=(targets.meals||[]).filter(m=>(!m.who||m.who===who)&&m[field]);
+  const tap=v=>{const a=getStack(kind);a.push(v);setStack(kind,a);apply(v)};
+  if(meals.length){
+    const chips=el("div",{class:"chips"});
+    for(const m of meals){
+      chips.append(el("button",{type:"button",onclick:()=>tap(m[field])},m.name+" ",el("b",{text:"+"+m[field]+unitLabel})));
+      if(m.half!==false){const h=Math.round(m[field]/2);chips.append(el("button",{type:"button",onclick:()=>tap(h)},"½ "+m.name+" ",el("b",{text:"+"+h+unitLabel})))}
+    }
+    box.append(el("div",{class:"eyebrow",text:"Our meals"}),chips);
+  }
   const inp=el("input",{id:kind+"_custom",type:"number",inputmode:"numeric",placeholder:ph});
   const add=el("button",{class:"btn",type:"button"},"Add");
   add.addEventListener("click",()=>{const v=Math.round(Number(inp.value));if(!(v>0)){setStatus("Enter a number from the label or Lose It.");return}setStatus("");inp.value="";inp.blur();const a=getStack(kind);a.push(v);setStack(kind,a);apply(v)});
@@ -669,7 +677,6 @@ function render(){
       el("span",{class:"box","aria-hidden":"true",text:on?"✓":""}),
       el("span",null,el("div",{class:"t",text:h.t}),el("div",{class:"d",text:desc}))));
   }
-  renderMeals(l);
   renderCalories(l);
   renderProtein(l);
   renderWater(l);
