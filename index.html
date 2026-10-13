@@ -782,12 +782,13 @@ function liftBox(day,l){
     const sg=suggestLift(who,lift,selDate), sv=saved[lift.n]||{};
     const wi=el("input",{type:"number",step:"any",inputmode:"decimal",placeholder:sg.w!=null?String(sg.w):"lb",value:sv.w!=null?String(sv.w):"",disabled:!can,"aria-label":lift.n+" weight"});
     const fs=el("select",{disabled:!can,"aria-label":lift.n+" how it felt"},el("option",{value:""},"How it felt"));
-    for(const [v,lab] of FEEL){const o=el("option",{value:v},lab);if(sv.f===v)o.selected=true;fs.append(o)}
+    for(const [v,lab] of FEEL){if(v==="skip")continue;const o=el("option",{value:v},lab);if(sv.f===v)o.selected=true;fs.append(o)}
+    let skipped=sv.f==="skip";
     const skipBtn=el("button",{type:"button",class:"skipbtn",disabled:!can},"Didn't do");
-    const syncSkip=()=>{const sk=fs.value==="skip";wi.disabled=!can||sk;if(sk)wi.value="";wi.placeholder=sk?"skipped":(sg.w!=null?String(sg.w):"lb");skipBtn.setAttribute("aria-pressed",String(sk));skipBtn.textContent=sk?"✓ Didn't do":"Didn't do"};
-    skipBtn.addEventListener("click",()=>{fs.value=fs.value==="skip"?"":"skip";syncSkip();document.getElementById("training").dataset.dirty="1"});
-    fs.addEventListener("change",syncSkip);syncSkip();
-    rows.push([lift,wi,fs]);
+    const syncSkip=()=>{const sk=skipped;wi.disabled=!can||sk;fs.disabled=!can||sk;if(sk){wi.value="";fs.value=""}wi.placeholder=sk?"skipped":(sg.w!=null?String(sg.w):"lb");skipBtn.setAttribute("aria-pressed",String(sk));skipBtn.textContent=sk?"✓ Didn't do":"Didn't do"};
+    skipBtn.addEventListener("click",()=>{skipped=!skipped;syncSkip();document.getElementById("training").dataset.dirty="1"});
+    syncSkip();
+    rows.push([lift,wi,fs,()=>skipped]);
     wrap.append(el("div",{class:"liftrow"},
       el("div",null,el("b",{text:lift.n}),el("div",{class:"hrs",text:(lift.unit?lift.unit+". ":"")+(sg.w!=null?"Try "+sg.w+": "+sg.why:sg.why)+(lift.plan&&sg.w!==lift.plan?" (plan says "+lift.plan+")":"")})),
       wi,fs,skipBtn));
@@ -796,15 +797,15 @@ function liftBox(day,l){
     const any=Object.keys(saved).length>0;
     const btn=el("button",{class:"btn primary",type:"button"},any?"Update weights":"Save weights");
     btn.addEventListener("click",()=>{
-      const lifts=rows.map(([lift,wi,fs])=>({n:lift.n,w:fs.value==="skip"||wi.value===""?null:Number(wi.value),f:fs.value||null})).filter(x=>x.w!=null||x.f);
+      const lifts=rows.map(([lift,wi,fs,isSkip])=>isSkip()?{n:lift.n,w:null,f:"skip"}:{n:lift.n,w:wi.value===""?null:Number(wi.value),f:fs.value||null}).filter(x=>x.w!=null||x.f);
       if(!lifts.length){setStatus("Enter at least one weight, or mark the ones you didn't do.");return}
-      const missing=rows.filter(([lift,wi,fs])=>wi.value===""&&!fs.value).map(r=>r[0].n);
+      const missing=rows.filter(([lift,wi,fs,isSkip])=>!isSkip()&&wi.value===""&&!fs.value).map(r=>r[0].n);
       setStatus("");
       const n=JSON.parse(JSON.stringify(logOf(who,selDate)));n.person=who;n.date=selDate;n.h=n.h||{};n.lifts=lifts;
       if(document.activeElement)document.activeElement.blur();
       document.getElementById("training").dataset.dirty="";
       saveLog(n);
-      if(missing.length)setStatus("Saved. Left blank: "+missing.join(", ")+". Pick \"Didn't do\" for any that weren't in today's workout.");
+      if(missing.length)setStatus("Saved. Left blank: "+missing.join(", ")+". Tap \"Didn't do\" for any that weren't in today's workout.");
     });
     wrap.append(el("div",null,btn,any?el("span",{class:"hint",style:"margin-left:10px;color:var(--good);font-size:13px",text:"✓ Saved"}):null),
       el("div",{class:"hrs",text:"The gray number is today's suggestion. Rate each one so next time's suggestion adjusts: easy goes up, too heavy comes down, just right twice in a row goes up."}));
