@@ -48,6 +48,7 @@ header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-co
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .seg button[data-p="maria"][aria-pressed="true"]{color:var(--maria)}
 .seg button[data-p="freddy"][aria-pressed="true"]{color:var(--freddy)}
+.seg button[data-p="sofia"][aria-pressed="true"]{color:#6C4BD8}
 button:focus-visible,input:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
 .grid2{display:grid;gap:20px;grid-template-columns:1fr}
@@ -258,6 +259,7 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
       <div class="seg" role="group" aria-label="Who is logging">
         <button id="whoMaria" data-p="maria" aria-pressed="true">Maria</button>
         <button id="whoFreddy" data-p="freddy" aria-pressed="false">Freddy</button>
+        <button id="whoSofia" data-p="sofia" aria-pressed="false">Sofia</button>
       </div>
     </div>
   </header>
@@ -268,7 +270,7 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
   <nav class="tabs" role="tablist" aria-label="Dashboard views">
     <button role="tab" id="tabBtnToday" aria-selected="true" aria-controls="tabToday">Today</button>
     <button role="tab" id="tabBtnProgress" aria-selected="false" aria-controls="tabProgress">Progress</button>
-    <button role="tab" id="tabBtnSofia" aria-selected="false" aria-controls="tabSofia">Sofia</button>
+    <button role="tab" id="tabBtnSofia" aria-selected="false" aria-controls="tabSofia" hidden>Sofia</button>
   </nav>
 
   <div id="tabToday" role="tabpanel" aria-labelledby="tabBtnToday" class="pane">
@@ -619,7 +621,7 @@ function setStatus(msg){const s=document.getElementById("status");s.textContent=
 
 document.getElementById("weekLabel").textContent="Week of "+parse(week[0]).toLocaleDateString(undefined,{month:"long",day:"numeric"});
 
-function setWho(p){who=p;try{localStorage.setItem("habitcup.who",p)}catch(e){}render()}
+function setWho(p){who=p;try{localStorage.setItem("habitcup.who",p)}catch(e){}if(tab==="sofia")setTab("today");else render()}
 document.getElementById("whoMaria").onclick=()=>setWho("maria");
 document.getElementById("whoFreddy").onclick=()=>setWho("freddy");
 
@@ -647,8 +649,9 @@ function render(){
   const root=document.documentElement.style;
   root.setProperty("--accent",`var(--${who})`);
   root.setProperty("--accent-soft",`var(--${who}-soft)`);
-  document.getElementById("whoMaria").setAttribute("aria-pressed",who==="maria");
-  document.getElementById("whoFreddy").setAttribute("aria-pressed",who==="freddy");
+  document.getElementById("whoMaria").setAttribute("aria-pressed",String(tab!=="sofia"&&who==="maria"));
+  document.getElementById("whoFreddy").setAttribute("aria-pressed",String(tab!=="sofia"&&who==="freddy"));
+  document.getElementById("whoSofia").setAttribute("aria-pressed",String(tab==="sofia"));
 
   // score
   const sc=document.getElementById("score"); sc.replaceChildren();
@@ -894,6 +897,7 @@ function setTab(t){
   document.getElementById("tabToday").hidden=t!=="today";
   document.getElementById("tabProgress").hidden=t!=="progress";
   document.getElementById("tabSofia").hidden=t!=="sofia";
+  document.querySelector("nav.tabs").hidden=t==="sofia";
   document.getElementById("tabBtnSofia").setAttribute("aria-selected",String(t==="sofia"));
   if(t==="sofia"){const f=document.getElementById("sofiaFrame");if(!f.src)f.src="sofia.html?embed=1&u="+encodeURIComponent(token||"")}
   document.getElementById("tabBtnToday").setAttribute("aria-selected",String(t==="today"));
@@ -903,6 +907,7 @@ function setTab(t){
 document.getElementById("tabBtnToday").onclick=()=>setTab("today");
 document.getElementById("tabBtnProgress").onclick=()=>setTab("progress");
 document.getElementById("tabBtnSofia").onclick=()=>setTab("sofia");
+document.getElementById("whoSofia").onclick=()=>setTab("sofia");
 window.addEventListener("message",e=>{if(e.data&&e.data.sofiaHeight){document.getElementById("sofiaFrame").style.height=(e.data.sofiaHeight+20)+"px"}});
 setTimeout(()=>setTab(tab),0);
 
