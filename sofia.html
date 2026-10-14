@@ -94,6 +94,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
       <div class="days" id="days"></div>
       <div class="checks" id="checks"></div>
     </section>
+    <section class="panel" id="coachCard" hidden></section>
     <section class="panel" id="medCard"></section>
     <section class="panel" id="workCard"></section>
     <section class="panel" id="waterCard"></section>
@@ -111,7 +112,7 @@ const QS=new URLSearchParams(location.search), EMBED=QS.get("embed")==="1";
 let token=null;
 try{const q=QS.get("u");if(q){if(!EMBED)localStorage.setItem("sofia.u",q);token=q}else token=localStorage.getItem("sofia.u")}catch(e){token=QS.get("u")}
 if(EMBED)document.documentElement.classList.add("embed");
-let logs={},plan=null,target=56,me=null,loaded=false,lastWrite=0,tab="today";
+let coach=null,logs={},plan=null,target=56,me=null,loaded=false,lastWrite=0,tab="today";
 const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const parse=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 const addDays=(d,n)=>{const x=parse(d);x.setDate(x.getDate()+n);return iso(x)};
@@ -146,6 +147,9 @@ function render(){
   if(workoutDay){item("meditate","Meditation","10 minutes, before the workout");item("workout","Workout",p.title)}
   else ch.append(el("div",{class:"notice",text:p?p.detail:"Plan starts Monday, October 12."}));
   item("water","Water",(l.water||0)+" of "+target+" oz, checks itself when you reach it",true);
+  // coach tips from the Sunday check-in
+  const cc=document.getElementById("coachCard"),cn=coach&&coach.sofia;cc.replaceChildren();cc.hidden=!(cn&&(cn.summary||(cn.changes&&cn.changes.length)));
+  if(!cc.hidden){cc.append(el("h2",{text:"Coach's tips this week"}));if(cn.summary)cc.append(el("div",{text:cn.summary}));if(cn.changes&&cn.changes.length){const ul=el("ul",{style:"margin:0;padding-left:20px;display:grid;gap:4px"});for(const c of cn.changes)ul.append(el("li",{text:c}));cc.append(ul)}}
   // meditation card
   const mc=document.getElementById("medCard");mc.replaceChildren();mc.hidden=!workoutDay;
   if(workoutDay){mc.append(el("h2",{text:"Meditation"}),vid(p.meditation),el("div",{class:"links"},el("div",{class:"eyebrow",text:"Or try"}),el("a",{href:p.medAlt.url,target:"_blank",rel:"noopener",text:p.medAlt.label+" ("+p.medAlt.len+")"})))}
@@ -154,14 +158,7 @@ function render(){
   if(workoutDay){
     wc.append(el("h2",{text:p.title}),el("div",{class:"sub",text:p.detail}),vid(p.video));
     const lk=el("div",{class:"links"},el("div",{class:"eyebrow",text:"Other workouts to try"}));for(const a of p.links)lk.append(el("a",{href:a.url,target:"_blank",rel:"noopener",text:a.label+" ("+a.len+")"}));wc.append(lk);
-    const fields=[...(p.lifts||[]),...(p.check||[])];
-    if(fields.length&&sel<=todayStr){
-      const saved={};for(const x of (l.lifts||[]))saved[x.n]=x.w;
-      wc.append(el("div",{class:"eyebrow",text:p.check?"Weights and strength check":"How heavy were your dumbbells?"}));
-      const ins=[];
-      for(const f of fields){const i=el("input",{type:"number",step:"any",inputmode:"decimal",placeholder:f.unit,value:saved[f.n]!=null?String(saved[f.n]):"",disabled:!can,"aria-label":f.n});ins.push([f,i]);wc.append(el("div",{class:"lift"},el("span",{text:f.n+(f.unit==="lb"?" (leave blank if no weights)":"")}),i))}
-      if(can){const b=el("button",{class:"btn primary",type:"button"},Object.keys(saved).length?"Update":"Save");b.addEventListener("click",()=>{const n=clone();n.lifts=ins.filter(([f,i])=>i.value!=="").map(([f,i])=>({n:f.n,w:Number(i.value)}));if(document.activeElement)document.activeElement.blur();save(n)});wc.append(el("div",null,b))}
-    }
+    if(sel<=todayStr&&(p.lifts||p.check))wc.append(liftBox(p,l,can));
   }
   // water
   const w=document.getElementById("waterCard");w.replaceChildren();
@@ -177,6 +174,54 @@ function render(){
   }
   renderProgress();
   if(EMBED)requestAnimationFrame(()=>parent.postMessage({sofiaHeight:document.documentElement.scrollHeight},"*"));
+}
+// Weights: per exercise group, with what she used last time and a suggestion. Kid steps follow
+// a normal dumbbell ladder; easy goes up a step, too heavy comes down, just right twice in a row goes up.
+const LADDER=[1,2,3,5,8,10,12,15,20];
+const stepUp=w=>LADDER.find(x=>x>w)||w+5, stepDown=w=>[...LADDER].reverse().find(x=>x<w)||Math.max(0,w-1);
+const FEEL=[["easy","Easy"],["right","Just right"],["hard","Too heavy"]];
+function liftHistory(name,before){const out=[];for(const l of Object.values(logs)){if(l.person!==ME||!l.lifts||(before&&l.date>=before))continue;for(const x of l.lifts)if(x.n===name&&x.w!=null)out.push({date:l.date,w:x.w,f:x.f})}return out.sort((a,b)=>a.date<b.date?-1:1)}
+function suggest(name,before){const h=liftHistory(name,before),last=h[h.length-1],prev=h[h.length-2];
+  if(!last)return {w:null,last:null,why:"First time: pick a weight where the last 2 reps feel hard but her form stays good."};
+  const ls=last.w+" lb on "+parse(last.date).toLocaleDateString(undefined,{month:"short",day:"numeric"})+(last.f?" ("+(FEEL.find(x=>x[0]===last.f)||["",""])[1].toLowerCase()+")":"");
+  if(last.f==="easy")return {w:stepUp(last.w),last:ls,why:"felt easy, so try a little heavier"};
+  if(last.f==="hard")return {w:stepDown(last.w),last:ls,why:"felt too heavy, so go a little lighter"};
+  if(last.f==="right"&&prev&&prev.w===last.w&&prev.f==="right")return {w:stepUp(last.w),last:ls,why:"just right two times in a row, so try a little heavier"};
+  return {w:last.w,last:ls,why:"stay here until it feels easy"};}
+function liftBox(p,l,can){
+  const box=el("div",{style:"display:grid;gap:10px"});
+  const saved={};for(const x of (l.lifts||[]))saved[x.n]=x;
+  const rows=[];
+  if(p.lifts&&p.lifts.length){
+    box.append(el("div",{class:"eyebrow",text:"Weights today (lb each hand)"}));
+    for(const f of p.lifts){
+      const sg=suggest(f.n,sel), sv=saved[f.n]||{};let skipped=sv.f==="skip";
+      const wi=el("input",{type:"number",step:"any",inputmode:"decimal",placeholder:sg.w!=null?String(sg.w):"lb",value:sv.w!=null?String(sv.w):"","aria-label":f.n+" weight"});
+      const fs=el("select",{"aria-label":f.n+" how it felt"},el("option",{value:""},"How it felt"));for(const [v,lab] of FEEL){const o=el("option",{value:v},lab);if(sv.f===v)o.selected=true;fs.append(o)}
+      const sk=el("button",{type:"button",class:"btn",style:"padding:6px 10px;font-size:14px"},"Didn't do");
+      const sync=()=>{wi.disabled=!can||skipped;fs.disabled=!can||skipped;sk.disabled=!can;if(skipped){wi.value="";fs.value=""}sk.textContent=skipped?"✓ Didn't do":"Didn't do"};
+      sk.addEventListener("click",()=>{skipped=!skipped;sync()});sync();
+      rows.push([f,wi,fs,()=>skipped]);
+      box.append(el("div",{style:"display:grid;gap:6px;border-top:1px solid var(--line);padding-top:8px"},
+        el("b",{text:f.n}),
+        el("div",{class:"sub",style:"font-size:14px",text:(sg.last?"Last time: "+sg.last+". ":"")+(sg.w!=null?"Try "+sg.w+" lb: ":"")+sg.why}),
+        el("div",{class:"row"},wi,fs,sk)));
+    }
+  }
+  if(p.check&&p.check.length){
+    box.append(el("div",{class:"eyebrow",style:"margin-top:6px",text:"Strength check (every 4 weeks)"}));
+    for(const f of p.check){const sv=saved[f.n]||{},prev=liftHistory(f.n,sel).pop();
+      const i=el("input",{type:"number",step:"any",inputmode:"numeric",placeholder:f.unit,value:sv.w!=null?String(sv.w):"",disabled:!can,"aria-label":f.n});
+      rows.push([f,i,null,()=>false]);
+      box.append(el("div",{class:"lift"},el("span",null,el("b",{text:f.n}),prev?el("div",{class:"sub",style:"font-size:13px",text:"Last check: "+prev.w+" "+f.unit}):null),i))}
+  }
+  if(can){
+    const b=el("button",{class:"btn primary",type:"button"},Object.keys(saved).length?"Update":"Save");
+    b.addEventListener("click",()=>{const n=clone();n.lifts=rows.map(([f,wi,fs,isSkip])=>isSkip()?{n:f.n,w:null,f:"skip"}:{n:f.n,w:wi.value===""?null:Number(wi.value),f:fs&&fs.value?fs.value:null}).filter(x=>x.w!=null||x.f);if(document.activeElement)document.activeElement.blur();save(n)});
+    box.append(el("div",null,b,Object.keys(saved).length?el("span",{class:"sub",style:"margin-left:10px;color:var(--good)",text:"✓ Saved"}):null),
+      el("div",{class:"sub",style:"font-size:13px",text:"The gray number is today's suggestion. Rate each one so next time's suggestion adjusts. Good form always comes before heavier weights."}));
+  }
+  return box;
 }
 function vid(v){return el("a",{class:"video",href:v.url,target:"_blank",rel:"noopener"},el("span",{class:"play","aria-hidden":"true",text:"▶"}),el("span",null,el("b",{text:v.label}),el("span",{text:"YouTube · "+v.len+(v.views?" · "+v.views+" views":"")})))}
 
@@ -209,7 +254,9 @@ function renderProgress(){
     el("div",{class:"sub",text:wdays+" days of reaching your water goal."})));
   const series=n=>all.map(l=>({x:l.date,y:((l.lifts||[]).find(x=>x.n===n)||{}).w})).filter(p=>p.y!=null);
   const panel=(t,sub,ch)=>box.append(el("section",{class:"panel"},el("h2",{text:t}),el("div",{class:"sub",text:sub}),ch));
-  panel("Dumbbell weight (lb each)","The weight you used on strength days. Go up only when the workout feels easy and your form stays good.",line(series("Dumbbells (lb each)"),"lb","dumbbell weight"));
+  const liftNames=[];for(const l of all)for(const x of (l.lifts||[]))if(x.w!=null&&!/Push-ups|Squats in|Plank/.test(x.n)&&!liftNames.includes(x.n))liftNames.push(x.n);
+  if(!liftNames.length)panel("Dumbbell weights","The weights she uses on strength days show up here, one chart per exercise.",el("div",{class:"notice",text:"No weights logged yet."}));
+  for(const n of liftNames)panel(n+" (lb each)","Go up only when it feels easy and her form stays good.",line(series(n),"lb",n));
   panel("Push-ups in a row","Strength check every 4 weeks. More push-ups means a stronger upper body.",line(series("Push-ups in a row"),"push-ups","push-ups"));
   panel("Squats in 1 minute","Strength check every 4 weeks.",line(series("Squats in 1 minute"),"squats","squats"));
   panel("Plank hold (seconds)","Strength check every 4 weeks. A longer plank means a stronger core.",line(series("Plank hold"),"seconds","plank"));
@@ -221,7 +268,7 @@ async function load(){
   try{
     const r=await fetch(API+"?u="+encodeURIComponent(token)+"&_="+Date.now(),{credentials:"omit",cache:"no-store"}).then(x=>x.json());
     if(!r.ok){setStatus(r.error==="unknown link"?"This link isn't recognized. Open Sofia's personal link.":"Couldn't load. Pull down to refresh.");return}
-    const d=r.data;me=d.me;plan=(d.plans||{}).sofia||null;const t=d.targets&&d.targets.people&&d.targets.people.sofia;if(t&&t.waterOz)target=t.waterOz;
+    const d=r.data;me=d.me;coach=d.coach||null;plan=(d.plans||{}).sofia||null;const t=d.targets&&d.targets.people&&d.targets.people.sofia;if(t&&t.waterOz)target=t.waterOz;
     if(Date.now()-lastWrite>8000){const n={};for(const[k,v]of Object.entries(d.logs||{}))if(v.person===ME)n[k]=v;logs=n}
     loaded=true;setStatus("");render();
   }catch(e){setStatus("Couldn't reach the data. Check the internet and pull down to refresh.")}
