@@ -602,7 +602,7 @@ function renderSleep(l){
   notes.append(el("div",{class:"hrs",text:"Enter steps at the end of the day and the habit checks itself. Bedtime is last night's, so it scores yesterday."}));
   box.append(notes);
 }
-function allPts(){return Object.values(logs).reduce((n,l)=>n+pts(l),0)}
+function allPts(){return Object.values(logs).filter(l=>PEOPLE.includes(l.person)).reduce((n,l)=>n+pts(l),0)}
 function T(p,d){
   const base=(targets.people&&targets.people[p])||DEFAULT_TARGETS.people[p];
   if(!d||!base.phases)return base;

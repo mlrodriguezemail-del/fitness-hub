@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sofia Fit">
+<meta name="robots" content="noindex">
+<title>Sofia's Workouts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+:root{
+  --bg:#F6F4FB; --surface:#FFFFFF; --sunk:#EFEBF8; --ink:#231E33; --muted:#665F7A; --line:#E0DAEE;
+  --accent:#6C4BD8; --accent-soft:#ECE6FD; --water:#1F8FC4; --water-soft:#DDF1FB; --good:#22925A; --sun:#E89A1B;
+  --display:"Baloo 2","Avenir Next Rounded",system-ui,sans-serif; --body:"Nunito","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;
+  --bg:#141221; --surface:#1D1A2C; --sunk:#181526; --ink:#ECE8F7; --muted:#A49DBA; --line:#302B45;
+  --accent:#A994F5; --accent-soft:#2A2347; --water:#6CC4EC; --water-soft:#14303E; --good:#5BCB8E; --sun:#F2B24A}}
+:root[data-theme="dark"]{color-scheme:dark;
+  --bg:#141221; --surface:#1D1A2C; --sunk:#181526; --ink:#ECE8F7; --muted:#A49DBA; --line:#302B45;
+  --accent:#A994F5; --accent-soft:#2A2347; --water:#6CC4EC; --water-soft:#14303E; --good:#5BCB8E; --sun:#F2B24A}
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:760px;margin:0 auto;display:grid;gap:18px}
+h1,h2{font-family:var(--display);margin:0;line-height:1.1}
+h1{font-size:clamp(30px,8vw,42px);color:var(--accent)}
+h2{font-size:22px}
+.sub{color:var(--muted)}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.num{font-variant-numeric:tabular-nums}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:grid;gap:12px}
+.notice{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;color:var(--muted);font-size:14px}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line)}
+.tabs button{font:inherit;font-weight:800;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:8px 14px;cursor:pointer;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.pane{display:grid;gap:18px}.pane[hidden]{display:none}
+.stars{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.star{background:var(--sunk);border-radius:14px;padding:10px 12px;text-align:center}
+.star b{display:block;font-family:var(--display);font-size:26px}
+.star span{font-size:13px;color:var(--muted);font-weight:700}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.days button{font:inherit;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:6px 0;cursor:pointer;display:grid}
+.days button span{font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:800}
+.days button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.days button.future{border-style:dashed;color:var(--muted)}
+.days button.done span{color:var(--good)}
+.checks{display:grid;gap:8px}
+.check{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;color:var(--ink);background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:12px 14px;cursor:pointer}
+.check .box{flex:none;width:30px;height:30px;border-radius:10px;border:2px solid var(--line);display:grid;place-items:center;font-weight:800;color:#fff}
+.check[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.check[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent)}
+.check b{font-weight:800}.check small{display:block;color:var(--muted);font-size:13px}
+.check:disabled{cursor:default}
+.video{display:flex;gap:12px;align-items:center;text-decoration:none;color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--sunk)}
+.video .play{flex:none;width:38px;height:38px;border-radius:50%;background:var(--accent);color:var(--surface);display:grid;place-items:center}
+.video b{display:block}.video span{font-size:13px;color:var(--muted)}
+.links{display:grid;gap:4px;font-size:15px}.links a{color:var(--accent);font-weight:700}
+.bar{height:12px;border-radius:99px;background:var(--line);overflow:hidden}.bar i{display:block;height:100%;border-radius:99px;background:var(--water)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:inherit;font-size:14px;font-weight:700;border:1px solid var(--line);background:var(--water-soft);color:var(--ink);border-radius:999px;padding:7px 12px;cursor:pointer}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:110px}
+.btn{font:inherit;font-weight:800;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:8px 14px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn:disabled{opacity:.45;cursor:default}
+.lift{display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:center}
+.chart svg{width:100%;height:auto;display:block}
+svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
+.chart{position:relative}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Monday, Wednesday, Friday</div>
+    <h1 id="hello">Sofia's Workouts</h1>
+    <div class="sub">10 minutes of meditation, then a 15 to 20 minute workout. Water every day.</div>
+  </header>
+  <div class="notice" id="status" hidden></div>
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button role="tab" id="tToday" aria-selected="true">Today</button>
+    <button role="tab" id="tProg" aria-selected="false">Progress</button>
+  </nav>
+  <div class="pane" id="pToday">
+    <section class="panel">
+      <div class="stars" id="stars"></div>
+      <div class="days" id="days"></div>
+      <div class="checks" id="checks"></div>
+    </section>
+    <section class="panel" id="medCard"></section>
+    <section class="panel" id="workCard"></section>
+    <section class="panel" id="waterCard"></section>
+  </div>
+  <div class="pane" id="pProg" hidden></div>
+</div>
+<script>
+(function(){
+const API="https://script.google.com/macros/s/AKfycbyHb6fbHWC6hP8u9egMTXx08RD2RlC-yWAsksWm-edut-d5-kktoGjGSz_6dCb9F1sISA/exec";
+const ME="sofia";
+const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const DRINKS=[["Glass of water",8],["Water bottle",16.9],["Juice box size",6.75]];
+let token=null;
+try{const q=new URLSearchParams(location.search).get("u");if(q){localStorage.setItem("sofia.u",q);token=q}else token=localStorage.getItem("sofia.u")}catch(e){token=new URLSearchParams(location.search).get("u")}
+let logs={},plan=null,target=56,me=null,loaded=false,lastWrite=0,tab="today";
+const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const parse=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+const addDays=(d,n)=>{const x=parse(d);x.setDate(x.getDate()+n);return iso(x)};
+const todayStr=iso(new Date());
+const weekOf=d=>{const x=parse(d),off=(x.getDay()+6)%7;return DOW.map((_,i)=>addDays(iso(x),i-off))};
+let week=weekOf(todayStr), sel=todayStr;
+function el(t,a,...k){const e=document.createElement(t);if(a)for(const[x,v]of Object.entries(a)){if(x==="class")e.className=v;else if(x==="text")e.textContent=v;else if(x.startsWith("on"))e.addEventListener(x.slice(2),v);else if(v!==false&&v!=null)e.setAttribute(x,v===true?"":v)}for(const c of k)if(c!=null)e.append(c);return e}
+function setStatus(m){const s=document.getElementById("status");s.textContent=m||"";s.hidden=!m}
+const logOf=d=>logs["sofia_"+d]||{person:ME,date:d,h:{},lifts:[]};
+const canWrite=()=>loaded&&me===ME&&sel<=todayStr;
+function dayPlan(d){if(!plan||d<plan.start)return null;const wi=Math.floor((parse(d)-parse(plan.start))/864e5/7)%plan.weeks.length;return plan.weeks[wi].days[(parse(d).getDay()+6)%7]}
+function post(body){lastWrite=Date.now();body.u=token;return fetch(API,{method:"POST",mode:"no-cors",credentials:"omit",body:JSON.stringify(body)})}
+function save(l){l.person=ME;l.date=sel;logs["sofia_"+sel]=l;render();post({action:"setLog",log:l}).catch(()=>setStatus("That didn't save. Check the internet and try again."))}
+const clone=()=>JSON.parse(JSON.stringify(logOf(sel)));
+
+function render(){
+  // stars: this week
+  const wk=week.map(logOf), dp=week.map(dayPlan);
+  const workDays=dp.filter(x=>x&&x.kind==="workout").length||3;
+  const st=document.getElementById("stars");st.replaceChildren(
+    el("div",{class:"star"},el("b",{class:"num",text:wk.filter(l=>l.h&&l.h.workout).length+"/"+workDays}),el("span",{text:"workouts"})),
+    el("div",{class:"star"},el("b",{class:"num",text:wk.filter(l=>l.h&&l.h.meditate).length+"/"+workDays}),el("span",{text:"meditations"})),
+    el("div",{class:"star"},el("b",{class:"num",text:String(wk.filter(l=>(l.water||0)>=target).length)}),el("span",{text:"water days"})));
+  const days=document.getElementById("days");days.replaceChildren();
+  week.forEach((d,i)=>{const l=logOf(d),p=dayPlan(d),done=p&&p.kind==="workout"&&l.h&&l.h.workout;
+    days.append(el("button",{"aria-pressed":String(d===sel),class:(d>todayStr?"future ":"")+(done?"done":""),onclick:()=>{sel=d;render()}},el("span",{text:DOW[i]+(done?" ✓":"")}),el("b",{text:String(parse(d).getDate())})))});
+  const p=dayPlan(sel), l=logOf(sel), can=canWrite(), workoutDay=p&&p.kind==="workout";
+  // checklist
+  const ch=document.getElementById("checks");ch.replaceChildren();
+  const item=(k,label,sub,auto)=>{const on=!!(l.h&&l.h[k]);ch.append(el("button",{class:"check","aria-pressed":String(on),disabled:!can||auto,onclick:()=>{const n=clone();n.h=n.h||{};n.h[k]=!on;save(n)}},el("span",{class:"box",text:on?"✓":""}),el("span",null,el("b",{text:label}),el("small",{text:sub}))))};
+  if(sel>todayStr)ch.append(el("div",{class:"notice",text:"Looking ahead. You can check things off when the day comes."}));
+  if(workoutDay){item("meditate","Meditation","10 minutes, before the workout");item("workout","Workout",p.title)}
+  else ch.append(el("div",{class:"notice",text:p?p.detail:"Plan starts Monday, October 12."}));
+  item("water","Water",(l.water||0)+" of "+target+" oz, checks itself when you reach it",true);
+  // meditation card
+  const mc=document.getElementById("medCard");mc.replaceChildren();mc.hidden=!workoutDay;
+  if(workoutDay){mc.append(el("h2",{text:"Meditation"}),vid(p.meditation),el("div",{class:"links"},el("div",{class:"eyebrow",text:"Or try"}),el("a",{href:p.medAlt.url,target:"_blank",rel:"noopener",text:p.medAlt.label+" ("+p.medAlt.len+")"})))}
+  // workout card
+  const wc=document.getElementById("workCard");wc.replaceChildren();wc.hidden=!workoutDay;
+  if(workoutDay){
+    wc.append(el("h2",{text:p.title}),el("div",{class:"sub",text:p.detail}),vid(p.video));
+    const lk=el("div",{class:"links"},el("div",{class:"eyebrow",text:"Other workouts to try"}));for(const a of p.links)lk.append(el("a",{href:a.url,target:"_blank",rel:"noopener",text:a.label+" ("+a.len+")"}));wc.append(lk);
+    const fields=[...(p.lifts||[]),...(p.check||[])];
+    if(fields.length&&sel<=todayStr){
+      const saved={};for(const x of (l.lifts||[]))saved[x.n]=x.w;
+      wc.append(el("div",{class:"eyebrow",text:p.check?"Weights and strength check":"How heavy were your dumbbells?"}));
+      const ins=[];
+      for(const f of fields){const i=el("input",{type:"number",step:"any",inputmode:"decimal",placeholder:f.unit,value:saved[f.n]!=null?String(saved[f.n]):"",disabled:!can,"aria-label":f.n});ins.push([f,i]);wc.append(el("div",{class:"lift"},el("span",{text:f.n+(f.unit==="lb"?" (leave blank if no weights)":"")}),i))}
+      if(can){const b=el("button",{class:"btn primary",type:"button"},Object.keys(saved).length?"Update":"Save");b.addEventListener("click",()=>{const n=clone();n.lifts=ins.filter(([f,i])=>i.value!=="").map(([f,i])=>({n:f.n,w:Number(i.value)}));if(document.activeElement)document.activeElement.blur();save(n)});wc.append(el("div",null,b))}
+    }
+  }
+  // water
+  const w=document.getElementById("waterCard");w.replaceChildren();
+  const tot=l.water||0, b=el("div",{class:"bar"}),bi=el("i");bi.style.width=Math.min(100,Math.round(tot/target*100))+"%";b.append(bi);
+  w.append(el("div",{class:"row",style:"justify-content:space-between"},el("h2",{text:"Water"}),el("b",{class:"num",text:Math.round(tot*10)/10+" / "+target+" oz"})),b);
+  if(can){
+    const addW=oz=>{const n=clone();n.water=Math.max(0,Math.round(((n.water||0)+oz)*10)/10);n.h=n.h||{};n.h.water=n.water>=target;try{const k="sofia.w."+sel,a=JSON.parse(localStorage.getItem(k)||"[]");if(oz>0){a.push(oz);localStorage.setItem(k,JSON.stringify(a))}}catch(e){}save(n)};
+    const c=el("div",{class:"chips"});for(const [lab,oz] of DRINKS)c.append(el("button",{type:"button",onclick:()=>addW(oz)},lab+" +"+oz+" oz"));w.append(c);
+    const inp=el("input",{type:"number",inputmode:"decimal",placeholder:"ounces"}),add=el("button",{class:"btn",type:"button"},"Add"),undo=el("button",{class:"btn",type:"button"},"Undo last");
+    add.addEventListener("click",()=>{const v=Number(inp.value);if(v>0){inp.value="";addW(v)}});
+    undo.addEventListener("click",()=>{try{const k="sofia.w."+sel,a=JSON.parse(localStorage.getItem(k)||"[]"),v=a.pop();localStorage.setItem(k,JSON.stringify(a));if(v)addW(-v)}catch(e){}});
+    w.append(el("div",{class:"row"},inp,add,undo));
+  }
+  renderProgress();
+}
+function vid(v){return el("a",{class:"video",href:v.url,target:"_blank",rel:"noopener"},el("span",{class:"play","aria-hidden":"true",text:"▶"}),el("span",null,el("b",{text:v.label}),el("span",{text:"YouTube · "+v.len+(v.views?" · "+v.views+" views":"")})))}
+
+function line(points,unit,label){
+  if(!points.length)return el("div",{class:"notice",text:"Nothing logged yet."});
+  const W=600,H=200,pl=40,pr=14,pt=14,pb=26,ns="http://www.w3.org/2000/svg";
+  const xs=points.map(p=>p.x),x0=xs[0],x1=xs[xs.length-1],span=Math.max(1,(parse(x1)-parse(x0))/864e5);
+  let y0=Math.min(...points.map(p=>p.y)),y1=Math.max(...points.map(p=>p.y));const pad=(y1-y0)*.15||1;y0=Math.max(0,y0-pad);y1+=pad;
+  const X=d=>pl+((parse(d)-parse(x0))/864e5)/span*(W-pl-pr),Y=v=>pt+(y1-v)/(y1-y0)*(H-pt-pb);
+  const s=document.createElementNS(ns,"svg");s.setAttribute("viewBox",`0 0 ${W} ${H}`);s.setAttribute("role","img");s.setAttribute("aria-label",label);
+  const add=(t,a,txt)=>{const e=document.createElementNS(ns,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;s.append(e);return e};
+  for(let i=0;i<=3;i++){const v=y0+(y1-y0)*i/3;add("line",{x1:pl,x2:W-pr,y1:Y(v),y2:Y(v),stroke:"var(--line)"});add("text",{x:pl-6,y:Y(v)+4,"text-anchor":"end"},String(Math.round(v)))}
+  if(points.length>1)add("path",{d:points.map((p,i)=>(i?"L":"M")+X(p.x)+" "+Y(p.y)).join(" "),fill:"none",stroke:"var(--accent)","stroke-width":2.5,"stroke-linejoin":"round"});
+  for(const p of points){const c=add("circle",{cx:X(p.x),cy:Y(p.y),r:5,fill:"var(--accent)",stroke:"var(--surface)","stroke-width":2});add("title",{},p.y+" "+unit+", "+p.x);c.append(s.lastChild)}
+  const fmt=d=>parse(d).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+  add("text",{x:pl,y:H-8},fmt(x0));if(x1!==x0)add("text",{x:W-pr,y:H-8,"text-anchor":"end"},fmt(x1));
+  return el("div",{class:"chart"},s);
+}
+function renderProgress(){
+  if(tab!=="progress")return;
+  const box=document.getElementById("pProg");box.replaceChildren();
+  const all=Object.values(logs).filter(l=>l.person===ME&&l.date<=todayStr).sort((a,b)=>a.date<b.date?-1:1);
+  const workouts=all.filter(l=>l.h&&l.h.workout).length, meds=all.filter(l=>l.h&&l.h.meditate).length, wdays=all.filter(l=>(l.water||0)>=target).length;
+  // streak: workout days done in a row (rest days don't break it)
+  let streak=0;for(let d=todayStr;d>=(plan?plan.start:todayStr);d=addDays(d,-1)){const p=dayPlan(d);if(!p||p.kind!=="workout")continue;const l=logOf(d);if(l.h&&l.h.workout)streak++;else if(d<todayStr)break}
+  box.append(el("section",{class:"panel"},el("h2",{text:"Sofia's progress"}),el("div",{class:"stars"},
+    el("div",{class:"star"},el("b",{class:"num",text:String(workouts)}),el("span",{text:"workouts done"})),
+    el("div",{class:"star"},el("b",{class:"num",text:String(meds)}),el("span",{text:"meditations"})),
+    el("div",{class:"star"},el("b",{class:"num",text:String(streak)}),el("span",{text:"workout streak"}))),
+    el("div",{class:"sub",text:wdays+" days of reaching your water goal."})));
+  const series=n=>all.map(l=>({x:l.date,y:((l.lifts||[]).find(x=>x.n===n)||{}).w})).filter(p=>p.y!=null);
+  const panel=(t,sub,ch)=>box.append(el("section",{class:"panel"},el("h2",{text:t}),el("div",{class:"sub",text:sub}),ch));
+  panel("Dumbbell weight (lb each)","The weight you used on strength days. Go up only when the workout feels easy and your form stays good.",line(series("Dumbbells (lb each)"),"lb","dumbbell weight"));
+  panel("Push-ups in a row","Strength check every 4 weeks. More push-ups means a stronger upper body.",line(series("Push-ups in a row"),"push-ups","push-ups"));
+  panel("Squats in 1 minute","Strength check every 4 weeks.",line(series("Squats in 1 minute"),"squats","squats"));
+  panel("Plank hold (seconds)","Strength check every 4 weeks. A longer plank means a stronger core.",line(series("Plank hold"),"seconds","plank"));
+}
+function setTab(t){tab=t;document.getElementById("pToday").hidden=t!=="today";document.getElementById("pProg").hidden=t!=="progress";document.getElementById("tToday").setAttribute("aria-selected",String(t==="today"));document.getElementById("tProg").setAttribute("aria-selected",String(t==="progress"));render()}
+document.getElementById("tToday").onclick=()=>setTab("today");document.getElementById("tProg").onclick=()=>setTab("progress");
+
+async function load(){
+  try{
+    const r=await fetch(API+"?u="+encodeURIComponent(token)+"&_="+Date.now(),{credentials:"omit",cache:"no-store"}).then(x=>x.json());
+    if(!r.ok){setStatus(r.error==="unknown link"?"This link isn't recognized. Open Sofia's personal link.":"Couldn't load. Pull down to refresh.");return}
+    const d=r.data;me=d.me;plan=(d.plans||{}).sofia||null;const t=d.targets&&d.targets.people&&d.targets.people.sofia;if(t&&t.waterOz)target=t.waterOz;
+    if(Date.now()-lastWrite>8000){const n={};for(const[k,v]of Object.entries(d.logs||{}))if(v.person===ME)n[k]=v;logs=n}
+    loaded=true;setStatus("");render();
+  }catch(e){setStatus("Couldn't reach the data. Check the internet and pull down to refresh.")}
+}
+if(!token)setStatus("Open Sofia's personal link. It ends in ?u= followed by her code.");
+else{load();setInterval(()=>{if(document.visibilityState==="visible"&&Date.now()-lastWrite>8000&&!document.querySelector("#workCard input:focus,#waterCard input:focus"))load()},60000)}
+render();
+})();
+</script>
+</body>
+</html>
