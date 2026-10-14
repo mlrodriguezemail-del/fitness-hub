@@ -268,6 +268,7 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
   <nav class="tabs" role="tablist" aria-label="Dashboard views">
     <button role="tab" id="tabBtnToday" aria-selected="true" aria-controls="tabToday">Today</button>
     <button role="tab" id="tabBtnProgress" aria-selected="false" aria-controls="tabProgress">Progress</button>
+    <button role="tab" id="tabBtnSofia" aria-selected="false" aria-controls="tabSofia">Sofia</button>
   </nav>
 
   <div id="tabToday" role="tabpanel" aria-labelledby="tabBtnToday" class="pane">
@@ -333,6 +334,10 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
     <div id="meBody"></div>
     <div id="meForm"></div>
   </section>
+  </div>
+
+  <div id="tabSofia" role="tabpanel" aria-labelledby="tabBtnSofia" class="pane" hidden>
+    <iframe id="sofiaFrame" title="Sofia's workouts" style="width:100%;border:0;min-height:900px;display:block" loading="lazy"></iframe>
   </div>
 
   <div id="tabProgress" role="tabpanel" aria-labelledby="tabBtnProgress" class="pane" hidden>
@@ -883,17 +888,22 @@ function renderTraining(){
 // ---- progress tab (lagging indicators) ----
 let progress=null;
 let tab="today";
-try{const t=localStorage.getItem("habitcup.tab");if(t==="progress")tab=t}catch(e){}
+try{const t=localStorage.getItem("habitcup.tab");if(t==="progress"||t==="sofia")tab=t}catch(e){}
 function setTab(t){
   tab=t;try{localStorage.setItem("habitcup.tab",t)}catch(e){}
   document.getElementById("tabToday").hidden=t!=="today";
   document.getElementById("tabProgress").hidden=t!=="progress";
+  document.getElementById("tabSofia").hidden=t!=="sofia";
+  document.getElementById("tabBtnSofia").setAttribute("aria-selected",String(t==="sofia"));
+  if(t==="sofia"){const f=document.getElementById("sofiaFrame");if(!f.src)f.src="sofia.html?embed=1&u="+encodeURIComponent(token||"")}
   document.getElementById("tabBtnToday").setAttribute("aria-selected",String(t==="today"));
   document.getElementById("tabBtnProgress").setAttribute("aria-selected",String(t==="progress"));
   render();
 }
 document.getElementById("tabBtnToday").onclick=()=>setTab("today");
 document.getElementById("tabBtnProgress").onclick=()=>setTab("progress");
+document.getElementById("tabBtnSofia").onclick=()=>setTab("sofia");
+window.addEventListener("message",e=>{if(e.data&&e.data.sofiaHeight){document.getElementById("sofiaFrame").style.height=(e.data.sofiaHeight+20)+"px"}});
 setTimeout(()=>setTab(tab),0);
 
 const PROGRAM_MONDAY="2026-10-05";

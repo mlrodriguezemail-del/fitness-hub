@@ -71,6 +71,8 @@ input{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(
 .chart svg{width:100%;height:auto;display:block}
 svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
 .chart{position:relative}
+html.embed body{padding-block:4px 16px;padding-inline:0;background:transparent}
+html.embed header{display:none}
 button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 </head>
@@ -104,8 +106,11 @@ const API="https://script.google.com/macros/s/AKfycbyHb6fbHWC6hP8u9egMTXx08RD2Rl
 const ME="sofia";
 const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const DRINKS=[["Glass of water",8],["Water bottle",16.9],["Juice box size",6.75]];
+// Embedded in the Habit Cup (embed=1) with Freddy's or Maria's own link; standalone on Sofia's iPad with hers.
+const QS=new URLSearchParams(location.search), EMBED=QS.get("embed")==="1";
 let token=null;
-try{const q=new URLSearchParams(location.search).get("u");if(q){localStorage.setItem("sofia.u",q);token=q}else token=localStorage.getItem("sofia.u")}catch(e){token=new URLSearchParams(location.search).get("u")}
+try{const q=QS.get("u");if(q){if(!EMBED)localStorage.setItem("sofia.u",q);token=q}else token=localStorage.getItem("sofia.u")}catch(e){token=QS.get("u")}
+if(EMBED)document.documentElement.classList.add("embed");
 let logs={},plan=null,target=56,me=null,loaded=false,lastWrite=0,tab="today";
 const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const parse=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
@@ -116,7 +121,7 @@ let week=weekOf(todayStr), sel=todayStr;
 function el(t,a,...k){const e=document.createElement(t);if(a)for(const[x,v]of Object.entries(a)){if(x==="class")e.className=v;else if(x==="text")e.textContent=v;else if(x.startsWith("on"))e.addEventListener(x.slice(2),v);else if(v!==false&&v!=null)e.setAttribute(x,v===true?"":v)}for(const c of k)if(c!=null)e.append(c);return e}
 function setStatus(m){const s=document.getElementById("status");s.textContent=m||"";s.hidden=!m}
 const logOf=d=>logs["sofia_"+d]||{person:ME,date:d,h:{},lifts:[]};
-const canWrite=()=>loaded&&me===ME&&sel<=todayStr;
+const canWrite=()=>loaded&&(me===ME||me==="maria"||me==="freddy")&&sel<=todayStr;
 function dayPlan(d){if(!plan||d<plan.start)return null;const wi=Math.floor((parse(d)-parse(plan.start))/864e5/7)%plan.weeks.length;return plan.weeks[wi].days[(parse(d).getDay()+6)%7]}
 function post(body){lastWrite=Date.now();body.u=token;return fetch(API,{method:"POST",mode:"no-cors",credentials:"omit",body:JSON.stringify(body)})}
 function save(l){l.person=ME;l.date=sel;logs["sofia_"+sel]=l;render();post({action:"setLog",log:l}).catch(()=>setStatus("That didn't save. Check the internet and try again."))}
@@ -171,6 +176,7 @@ function render(){
     w.append(el("div",{class:"row"},inp,add,undo));
   }
   renderProgress();
+  if(EMBED)requestAnimationFrame(()=>parent.postMessage({sofiaHeight:document.documentElement.scrollHeight},"*"));
 }
 function vid(v){return el("a",{class:"video",href:v.url,target:"_blank",rel:"noopener"},el("span",{class:"play","aria-hidden":"true",text:"▶"}),el("span",null,el("b",{text:v.label}),el("span",{text:"YouTube · "+v.len+(v.views?" · "+v.views+" views":"")})))}
 
@@ -208,7 +214,7 @@ function renderProgress(){
   panel("Squats in 1 minute","Strength check every 4 weeks.",line(series("Squats in 1 minute"),"squats","squats"));
   panel("Plank hold (seconds)","Strength check every 4 weeks. A longer plank means a stronger core.",line(series("Plank hold"),"seconds","plank"));
 }
-function setTab(t){tab=t;document.getElementById("pToday").hidden=t!=="today";document.getElementById("pProg").hidden=t!=="progress";document.getElementById("tToday").setAttribute("aria-selected",String(t==="today"));document.getElementById("tProg").setAttribute("aria-selected",String(t==="progress"));render()}
+function setTab(t){tab=t;window.scrollTo(0,0);document.getElementById("pToday").hidden=t!=="today";document.getElementById("pProg").hidden=t!=="progress";document.getElementById("tToday").setAttribute("aria-selected",String(t==="today"));document.getElementById("tProg").setAttribute("aria-selected",String(t==="progress"));render()}
 document.getElementById("tToday").onclick=()=>setTab("today");document.getElementById("tProg").onclick=()=>setTab("progress");
 
 async function load(){
